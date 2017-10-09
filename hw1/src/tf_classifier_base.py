@@ -101,8 +101,8 @@ class TFClassifierBase:
     def fit(self, X, y, callbacks=[]):
         # make loss tensor
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-        loss = self._loss(self._placeholders['y'], self._logits) \
-            + tf.reduce_sum(reg_losses) * self._reg_constant
+        loss = self._loss(self._placeholders['y'], self._logits) # \
+            # + tf.reduce_sum(reg_losses) * self._reg_constant
 
         # make train operator
         train_op = self._optimizer.minimize(
@@ -113,7 +113,7 @@ class TFClassifierBase:
         for metric in self._metrics:
             y_pred_argmax = tf.argmax(self._logits, axis=-1)
             # y_true_argmax = tf.argmax(self._placeholders['y'], axis=-1)
-            mask = tf.cast(self._placeholders['y'] > 0, tf.float32)
+            mask = tf.cast(self._placeholders['y'] >= 0, tf.float32)
             metric_tensors[metric] = \
                 self._metrics[metric](self._placeholders['y'],
                                       y_pred_argmax,
@@ -144,14 +144,17 @@ class TFClassifierBase:
             self._epoch += 1
 
     def predict_prob(self, X, batch_size=24):
-        y_prob = np.array([])
+        y_prob = None
         with tf.variable_scope('nn', reuse=True):
             for batch in BatchGenerator(X, None, batch_size, shuffle=False):
                 batch_y_prob = self._session.run(
-                    [self._logits],
+                    self._logits,
                     feed_dict={self._placeholders['x']: batch['x'],
                                self._placeholders['training']: False})
-                y_prob = np.concatenate([y_prob, batch_y_prob],
-                                        axis=0)
+                if y_prob is None:
+                    y_prob = batch_y_prob
+                else:
+                    y_prob = np.concatenate([y_prob, batch_y_prob],
+                                            axis=0)
 
         return y_prob

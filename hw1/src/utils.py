@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import pdb
 
 
 class DataProcessor:
@@ -29,7 +30,7 @@ class DataProcessor:
         # sort by sentence id
         df.sort_index(axis=0, inplace=True)
 
-        df.fillna(0)
+        df.fillna(0, inplace=True)
 
         # reuturn 3d matrix
         return df.as_matrix().reshape(df.shape[0],
@@ -58,7 +59,7 @@ class DataProcessor:
         # encode phones to integers
         for phone48 in self.phone_map48:
             df.replace(phone48, self.phone_map48[phone48], inplace=True)
-        df.fillna(-1)
+        df.fillna(-1, inplace=True)
 
         return df.as_matrix().astype(int)
 

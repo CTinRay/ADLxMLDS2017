@@ -40,7 +40,7 @@ class RNNClassifier(TFClassifierBase):
 
     def _loss(self, placeholder_y, logits):
         # mask out those out of sequence length
-        mask = tf.cast(placeholder_y > 0, tf.float32)
-        return tf.losses.sparse_softmax_cross_entropy(placeholder_y,
+        mask = tf.cast(placeholder_y >= 0, tf.int32)
+        return tf.losses.sparse_softmax_cross_entropy(placeholder_y * mask,
                                                       logits,
                                                       mask)
