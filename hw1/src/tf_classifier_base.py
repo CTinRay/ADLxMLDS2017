@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
@@ -158,3 +159,8 @@ class TFClassifierBase:
                                             axis=0)
 
         return y_prob
+
+    def save(self, path):
+        saver = tf.train.Saver()
+        filename = os.path.join(path, 'model.ckpt')
+        saver.save(self._session, filename)
