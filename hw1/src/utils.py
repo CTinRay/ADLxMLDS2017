@@ -29,6 +29,8 @@ class DataProcessor:
         # sort by sentence id
         df.sort_index(axis=0, inplace=True)
 
+        df.fillna(0)
+
         # reuturn 3d matrix
         return df.as_matrix().reshape(df.shape[0],
                                       df.columns[-1][0],
