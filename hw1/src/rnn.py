@@ -7,11 +7,11 @@ class RNNClassifier(TFClassifierBase):
         placeholders = \
             {'x': tf.placeholder(
                 tf.float32,
-                shape=(None, self._data_shape[1], self._data_shape[2]),
+                shape=(None, None, self._data_shape[2]),
                 name='x'),
              'y': tf.placeholder(
                  tf.int32,
-                 shape=(None, self._data_shape[1]),
+                 shape=(None, None),
                  name='y'),
              'training': tf.placeholder(tf.bool, name='training')}
 
@@ -21,14 +21,18 @@ class RNNClassifier(TFClassifierBase):
         with tf.variable_scope('RNN-Cell-bw'):
             rnn_cell_bw = tf.nn.rnn_cell.GRUCell(50)
 
-        # calculate the real length of body
-        lengths = tf.reduce_sum(tf.cast(placeholders['y'] >= 0, tf.int32),
-                                axis=-1)
+        # calculate sequence length
+        lengths = tf.reduce_sum(
+            1 - tf.cast(tf.is_nan(placeholders['x'][:, :, 0]),
+                        tf.int32),
+            axis=-1)
 
+        x = placeholders['x']
+        x = tf.where(tf.is_nan(x), tf.zeros_like(x), x)
         rnn_outputs = \
             tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
                                             rnn_cell_bw,
-                                            placeholders['x'],
+                                            x,
                                             sequence_length=lengths,
                                             dtype=tf.float32)[0]
         rnn_outputs = tf.concat(rnn_outputs, axis=-1)
