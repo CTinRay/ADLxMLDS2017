@@ -32,11 +32,11 @@ def main():
     n_classes = np.max(train['y']) + 1
     classifiers = {'rnn': RNNClassifier(train['x'].shape,
                                         n_classes,
-                                        valid=valid)}
+                                        valid=valid,
+                                        n_epochs=args.n_epochs)}
     clf = classifiers[args.model]
 
     clf.fit(train['x'], train['y'])
-
 
 if __name__ == '__main__':
     try:

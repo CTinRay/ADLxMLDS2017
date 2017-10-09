@@ -15,24 +15,25 @@ class RNNClassifier(TFClassifierBase):
                  name='y'),
              'training': tf.placeholder(tf.bool, name='training')}
 
-        # # bi-direction cells        
-        # with tf.variable_scope('RNN-Cell-fw'):
-        #     rnn_cell_fw = tf.nn.rnn_cell.GRUCell(self._n_classes)
-        # with tf.variable_scope('RNN-Cell-bw'):
-        #     rnn_cell_bw = tf.nn.rnn_cell.GRUCell(self._n_classes)
+        # bi-direction cells
+        with tf.variable_scope('RNN-Cell-fw'):
+            rnn_cell_fw = tf.nn.rnn_cell.GRUCell(50)
+        with tf.variable_scope('RNN-Cell-bw'):
+            rnn_cell_bw = tf.nn.rnn_cell.GRUCell(50)
 
-        # # calculate the real length of body
-        # lengths = tf.reduce_sum(tf.cast(placeholders['y'] > 0, tf.int32),
-        #                         axis=-1)
+        # calculate the real length of body
+        lengths = tf.reduce_sum(tf.cast(placeholders['y'] >= 0, tf.int32),
+                                axis=-1)
 
-        # rnn_outputs = \
-        #     tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
-        #                                     rnn_cell_bw,
-        #                                     placeholders['x'],
-        #                                     sequence_length=lengths,
-        #                                     dtype=tf.float32)
+        rnn_outputs = \
+            tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
+                                            rnn_cell_bw,
+                                            placeholders['x'],
+                                            sequence_length=lengths,
+                                            dtype=tf.float32)[0]
+        rnn_outputs = tf.concat(rnn_outputs, axis=-1)
 
-        logits = tf.layers.conv1d(placeholders['x'],
+        logits = tf.layers.conv1d(rnn_outputs,
                                   self._n_classes,
                                   1)
 
