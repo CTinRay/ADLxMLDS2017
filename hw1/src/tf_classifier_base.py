@@ -160,7 +160,16 @@ class TFClassifierBase:
 
         return y_prob
 
+    def predict(self, X, batch_size=24):
+        prob = self.predict_prob(X)
+        return np.argmax(prob, axis=-1)
+
     def save(self, path):
         saver = tf.train.Saver()
         filename = os.path.join(path, 'model.ckpt')
         saver.save(self._session, filename)
+
+    def load(self, path):
+        saver = tf.train.Saver()
+        filename = os.path.join(path, 'model.ckpt')
+        saver.restore(self._session, filename)
