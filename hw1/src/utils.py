@@ -1,11 +1,12 @@
 import os
+import re
 import pandas as pd
 import numpy as np
 import pdb
 
 
 class DataProcessor:
-    def _get_data(self, filename):
+    def _get_data(self, filename, sort=True):
         df = pd.read_csv(filename,
                          delim_whitespace=True,
                          header=None)
@@ -27,8 +28,9 @@ class DataProcessor:
         df.columns = df.columns.swaplevel(0, 1)
         df.sort_index(axis=1, level=0, inplace=True)
 
-        # sort by sentence id
-        df.sort_index(axis=0, inplace=True)
+        if sort:
+            # sort by sentence id
+            df.sort_index(axis=0, inplace=True)
 
         # reuturn 3d matrix
         return df.as_matrix().reshape(df.shape[0],
@@ -75,6 +77,14 @@ class DataProcessor:
                     self.phone_map39.append(phone39)
                 self.phone_map48[phone48] = self.phone_map39.index(phone39)
 
+        self.phone_char_map = [''] * 39
+        phone_char_file = os.path.join(path, '48phone_char.map')
+        with open(phone_char_file) as f:
+            for row in f:
+                phone = row.split()[0]
+                char = row.split()[2]
+                self.phone_char_map[self.phone_map48[phone]] = char
+
         if not test_only:
             self.train = {}
             self.train['x'] = \
@@ -89,7 +99,8 @@ class DataProcessor:
 
         self.test = {}
         self.test['x'] = \
-            self._get_data(os.path.join(path, 'fbank', 'test.ark'))
+            self._get_data(os.path.join(path, 'fbank', 'test.ark'),
+                           sort=False)
 
     def get_train_valid(self, valid_ratio=0.2):
         n_valid = int(self.train['x'].shape[0] * valid_ratio)
@@ -101,3 +112,24 @@ class DataProcessor:
 
     def get_test(self):
         return self.test
+
+    def int_to_char(self, pred, x):
+
+        # convert ints pred to chars
+        chars = np.array(self.phone_char_map)[pred]
+
+        # convert to char string
+        lengths = np.sum(1 - np.isnan(x[:, :, 0]).astype(int), axis=-1)
+        seqs = list(map(lambda x, l: ''.join(x[:l]), chars, lengths))
+
+        # remove consecutive
+        pattern = re.compile(r'([a-zA-Z])\1+')
+        seqs = list(map(lambda x: pattern.sub(r'\1', x), seqs))
+
+        # trim silence
+        silence = self.phone_map48['sil']
+        silence_char = self.phone_char_map[silence]
+        pattern = re.compile('(^%s*|%s*$)' % (silence_char, silence_char))
+        seqs = list(map(lambda x: pattern.sub('', x), seqs))
+
+        return seqs
