@@ -6,6 +6,7 @@ import traceback
 import numpy as np
 from callbacks import ModelCheckpoint
 from rnn import RNNClassifier
+from rnn_cnn import RNNCNNClassifier
 
 
 def main():
@@ -22,6 +23,8 @@ def main():
                         help='Batch size', default=128)
     parser.add_argument('--model', type=str,
                         help='model type', default='rnn')
+    parser.add_argument('--gpu_mem', type=float,
+                        help='GPU memory fraction', default=0.1)
     args = parser.parse_args()
 
     with open(args.data, 'rb') as f:
@@ -30,15 +33,17 @@ def main():
     train, valid = data_processor.get_train_valid()
     # test = data_processor.get_test()
 
-    n_classes = np.max(train['y']) + 1
-    classifiers = {'rnn': RNNClassifier(train['x'].shape,
-                                        n_classes,
-                                        batch_size=args.batch_size,
-                                        valid=valid,
-                                        n_epochs=args.n_epochs,
-                                        gpu_memory_fraction=1)}
-    clf = classifiers[args.model]
+    classifiers = {
+        'rnn': RNNClassifier,
+        'rnncnn': RNNCNNClassifier}
 
+    n_classes = np.max(train['y']) + 1
+    clf = classifiers[args.model](train['x'].shape, n_classes,
+                                  batch_size=args.batch_size,
+                                  valid=valid,
+                                  n_epochs=args.n_epochs,
+                                  gpu_memory_fraction=args.gpu_mem)
+    
     model_checkpoint = ModelCheckpoint(args.path,
                                        'accuracy', 1, 'max')
     clf.fit(train['x'], train['y'],

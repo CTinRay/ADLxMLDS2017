@@ -6,6 +6,7 @@ import traceback
 import editdistance
 import numpy as np
 from rnn import RNNClassifier
+from rnn_cnn import RNNCNNClassifier
 
 
 def mean_distance(truth, pred):
@@ -23,17 +24,22 @@ def main():
     parser.add_argument('path', type=str, help='Path for model')
     parser.add_argument('--model', type=str,
                         help='model type', default='rnn')
+    parser.add_argument('--gpu_mem', type=float,
+                        help='GPU memory fraction', default=0.1)
     args = parser.parse_args()
 
     with open(args.data, 'rb') as f:
         data_processor = pickle.load(f)
 
     train, valid = data_processor.get_train_valid()
-    classifiers = {'rnn': RNNClassifier(train['x'].shape,
-                                        39,
-                                        gpu_memory_fraction=1)}
+    classifiers = {
+        'rnn': RNNClassifier,
+        'rnncnn': RNNCNNClassifier}
 
-    clf = classifiers[args.model]
+    n_classes = np.max(train['y']) + 1
+    clf = classifiers[args.model](train['x'].shape, n_classes,
+                                  gpu_memory_fraction=args.gpu_mem)
+    
     clf.load(args.path)
 
     valid['y_'] = clf.predict(valid['x'])
