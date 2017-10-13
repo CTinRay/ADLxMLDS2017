@@ -49,7 +49,7 @@ class TFClassifierBase:
 
         loss /= X.shape[0] // self._batch_size + 1
         if train_op is None:
-            self._history.append(metrics["accuracy"][0])
+            self._history.append(metrics["accuracy"][1])
             if self._early_stop is not None:
                 self._history[-1] \
                   = max(self._history[-1:-self._early_stop - 1: -1])
@@ -59,7 +59,7 @@ class TFClassifierBase:
         epoch_log['loss'] = float(loss)
         print('loss=%f' % loss)
         for metric in self._metrics:
-            score = float(metrics[metric][0])
+            score = float(metrics[metric][1])
             epoch_log[metric] = score
             print(', %s=%f' % (metric, score), end='')
 
