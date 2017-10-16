@@ -27,9 +27,9 @@ class RNNClassifier(TFClassifierBase):
         # bi-direction cells
         with tf.variable_scope('bi-rnn1'):
             with tf.variable_scope('RNN-Cell-fw'):
-                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(100)
+                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(200)
             with tf.variable_scope('RNN-Cell-bw'):
-                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(100)
+                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(200)
 
             rnn_outputs = \
                 tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
