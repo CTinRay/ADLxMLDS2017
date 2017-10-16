@@ -1,4 +1,5 @@
 import os
+import pickle
 import re
 import pandas as pd
 import numpy as np
@@ -63,7 +64,7 @@ class DataProcessor:
 
         return df.as_matrix().astype(int)
 
-    def __init__(self, path, test_only=False):
+    def __init__(self, path, test_only=False, mean_var_file=None):
 
         # make phone tables
         self.phone_map48 = {}
@@ -92,15 +93,39 @@ class DataProcessor:
             self.train['y'] = \
                 self._get_label(os.path.join(path, 'label', 'train.lab'))
 
+            # self.train['x'] = np.concatenate(
+            #     (self.train['x'],
+            #      np.diff(self.train['x'], 1, -1),
+            #      np.diff(self.train['x'], 2, -1)),
+            #     axis=-1)
+
+            phones = self.train['x'].reshape((-1, self.train['x'].shape[-1]))
+            phones = phones[~np.isnan(phones[:, 1])]
+            self.mean = np.mean(phones, axis=0)
+            self.std = np.std(phones, axis=0)
+
+            self.train['x'] = (self.train['x'] - self.mean) / self.std
+
             indices = np.arange(self.train['x'].shape[0])
             np.random.shuffle(indices)
             self.train['x'] = self.train['x'][indices]
             self.train['y'] = self.train['y'][indices]
+        else:
+            with open(mean_var_file, 'rb') as f:
+                mean_var = pickle.load(f)
+                self.mean = mean_var['mean']
+                self.std = mean_var['std']
 
         self.test = {}
         self.test['x'] = \
             self._get_data(os.path.join(path, 'fbank', 'test.ark'),
                            sort=False)
+        # self.test['x'] = np.concatenate(
+        #         (self.test['x'],
+        #          np.diff(self.test['x'], 1, -1),
+        #          np.diff(self.test['x'], 2, -1)),
+        #         axis=-1)
+        self.test['x'] = (self.test['x'] - self.mean) / self.std
 
     def get_train_valid(self, valid_ratio=0.2):
         n_valid = int(self.train['x'].shape[0] * valid_ratio)

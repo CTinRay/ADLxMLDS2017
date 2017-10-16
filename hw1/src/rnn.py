@@ -15,12 +15,6 @@ class RNNClassifier(TFClassifierBase):
                  name='y'),
              'training': tf.placeholder(tf.bool, name='training')}
 
-        # bi-direction cells
-        with tf.variable_scope('RNN-Cell-fw'):
-            rnn_cell_fw = tf.nn.rnn_cell.GRUCell(50)
-        with tf.variable_scope('RNN-Cell-bw'):
-            rnn_cell_bw = tf.nn.rnn_cell.GRUCell(50)
-
         # calculate sequence length
         lengths = tf.reduce_sum(
             1 - tf.cast(tf.is_nan(placeholders['x'][:, :, 0]),
@@ -29,16 +23,39 @@ class RNNClassifier(TFClassifierBase):
 
         x = placeholders['x']
         x = tf.where(tf.is_nan(x), tf.zeros_like(x), x)
-        rnn_outputs = \
-            tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
-                                            rnn_cell_bw,
-                                            x,
-                                            sequence_length=lengths,
-                                            dtype=tf.float32)[0]
-        rnn_outputs = tf.concat(rnn_outputs, axis=-1)
+
+        # bi-direction cells
+        with tf.variable_scope('bi-rnn1'):
+            with tf.variable_scope('RNN-Cell-fw'):
+                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(100)
+            with tf.variable_scope('RNN-Cell-bw'):
+                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(100)
+
+            rnn_outputs = \
+                tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
+                                                rnn_cell_bw,
+                                                x,
+                                                sequence_length=lengths,
+                                                dtype=tf.float32)[0]
+            rnn_outputs = tf.concat(rnn_outputs, axis=-1)
+
+        # bi-direction cells
+        with tf.variable_scope('bi-rnn2'):
+            with tf.variable_scope('RNN-Cell-fw2'):
+                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(100)
+            with tf.variable_scope('RNN-Cell-bw2'):
+                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(100)
+
+            rnn_outputs = \
+                tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
+                                                rnn_cell_bw,
+                                                rnn_outputs,
+                                                sequence_length=lengths,
+                                                dtype=tf.float32)[0]
+            rnn_outputs = tf.concat(rnn_outputs, axis=-1)
 
         logits = tf.layers.conv1d(rnn_outputs,
-                                  self._n_classes,
+                                  self._n_classes + 1,
                                   1)
 
         return placeholders, logits
@@ -49,3 +66,11 @@ class RNNClassifier(TFClassifierBase):
         return tf.losses.sparse_softmax_cross_entropy(placeholder_y * mask,
                                                       logits,
                                                       mask)
+        # lengths = tf.reduce_sum(tf.cast(placeholder_y >= 0, tf.int32), axis=-1)
+        # indices = tf.where(placeholder_y >= 0)
+        # sparse_y = tf.SparseTensor(indices,
+        #                            tf.gather_nd(placeholder_y, indices),
+        #                            (self._batch_size, 777))
+        # losses = tf.nn.ctc_loss(sparse_y, logits, lengths, time_major=False,
+        #                         preprocess_collapse_repeated=True)
+        # return tf.reduce_sum(losses)

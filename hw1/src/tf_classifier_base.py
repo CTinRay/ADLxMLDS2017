@@ -106,8 +106,10 @@ class TFClassifierBase:
             # + tf.reduce_sum(reg_losses) * self._reg_constant
 
         # make train operator
-        train_op = self._optimizer.minimize(
-            loss, global_step=self._global_step)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_op = self._optimizer.minimize(
+                loss, global_step=self._global_step)
 
         # make metric tensors
         metric_tensors = {}
