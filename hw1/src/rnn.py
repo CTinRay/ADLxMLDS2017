@@ -27,9 +27,9 @@ class RNNClassifier(TFClassifierBase):
         # bi-direction cells
         with tf.variable_scope('bi-rnn1'):
             with tf.variable_scope('RNN-Cell-fw'):
-                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(200)
+                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(256)
             with tf.variable_scope('RNN-Cell-bw'):
-                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(200)
+                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(256)
 
             rnn_outputs = \
                 tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
@@ -41,10 +41,25 @@ class RNNClassifier(TFClassifierBase):
 
         # bi-direction cells
         with tf.variable_scope('bi-rnn2'):
+            with tf.variable_scope('RNN-Cell-fw'):
+                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(256)
+            with tf.variable_scope('RNN-Cell-bw'):
+                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(256)
+
+            rnn_outputs = \
+                tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
+                                                rnn_cell_bw,
+                                                x,
+                                                sequence_length=lengths,
+                                                dtype=tf.float32)[0]
+            rnn_outputs = tf.concat(rnn_outputs, axis=-1)
+
+        # bi-direction cells
+        with tf.variable_scope('bi-rnn3'):
             with tf.variable_scope('RNN-Cell-fw2'):
-                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(100)
+                rnn_cell_fw = tf.nn.rnn_cell.GRUCell(128)
             with tf.variable_scope('RNN-Cell-bw2'):
-                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(100)
+                rnn_cell_bw = tf.nn.rnn_cell.GRUCell(128)
 
             rnn_outputs = \
                 tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
