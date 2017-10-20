@@ -41,8 +41,8 @@ class RNNClassifier(TFClassifierBase):
                                                 dtype=tf.float32)[0]
             rnn_outputs = tf.concat(rnn_outputs, axis=-1)
 
-        x = tf.layers.dropout(x, rate=0.2,
-                              training=placeholders['training'])
+        rnn_outputs = tf.layers.dropout(rnn_outputs, rate=0.2,
+                                        training=placeholders['training'])
         # bi-direction cells
         with tf.variable_scope('bi-rnn2'):
             with tf.variable_scope('RNN-Cell-fw'):
@@ -53,13 +53,13 @@ class RNNClassifier(TFClassifierBase):
             rnn_outputs = \
                 tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
                                                 rnn_cell_bw,
-                                                x,
+                                                rnn_outputs,
                                                 sequence_length=lengths,
                                                 dtype=tf.float32)[0]
             rnn_outputs = tf.concat(rnn_outputs, axis=-1)
 
-        x = tf.layers.dropout(x, rate=0.2,
-                              training=placeholders['training'])
+        rnn_outputs = tf.layers.dropout(rnn_outputs, rate=0.2,
+                                        training=placeholders['training'])
         # bi-direction cells
         with tf.variable_scope('bi-rnn3'):
             with tf.variable_scope('RNN-Cell-fw2'):
