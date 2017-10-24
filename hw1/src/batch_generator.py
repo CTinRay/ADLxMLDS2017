@@ -13,7 +13,11 @@ def BatchGenerator(X, y, batch_size, shuffle=True):
         batch = {}
         batch['x'] = X[i * batch_size: (i + 1) * batch_size]
 
+        # lengths = np.sum(~np.isnan(batch['x'][:, :, 0]), axis=-1)
+        # max_length = np.max(lengths)
+        # batch['x'] = batch['x'][:, :max_length, :]
         if y is not None:
             batch['y'] = y[i * batch_size: (i + 1) * batch_size]
+            # batch['y'] = batch['y'][:, :max_length]
 
         yield batch
