@@ -1,6 +1,7 @@
 import math
 import tensorflow as tf
 from tf_classifier_base import TFClassifierBase
+from weighted_batch_normalization import weighted_batch_normalization
 
 
 class RNNCNNClassifier(TFClassifierBase):
@@ -17,67 +18,72 @@ class RNNCNNClassifier(TFClassifierBase):
              'training': tf.placeholder(tf.bool, name='training')}
 
         # calculate sequence length
-        lengths = tf.reduce_sum(
-            1 - tf.cast(tf.is_nan(placeholders['x'][:, :, 0]),
-                        tf.int32),
-            axis=-1)
+        mask = tf.cast(~ tf.is_nan(placeholders['x'][:, :, 0]),
+                       tf.int32)
+        lengths = tf.reduce_sum(mask, axis=-1)
 
         # mask out those out of length
         x = placeholders['x']
         x = tf.where(tf.is_nan(x), tf.zeros_like(x), x)
 
         # cnn layer
-        x = tf.reshape(x, (tf.shape(x)[0], tf.shape(x)[1], tf.shape(x)[2], 1))
-        x = tf.layers.conv2d(x, 16, (3, 3), padding='same')
-        x = tf.layers.batch_normalization(x,
-                                          training=placeholders['training'],
-                                          name='bn1')
-        x = tf.nn.relu(x)
-        x1 = tf.layers.max_pooling2d(x, (1, 3), (1, 3), padding='same')
+        # x = tf.reshape(x, (tf.shape(x)[0], tf.shape(x)[1], tf.shape(x)[2], 1))
 
-        x2 = tf.layers.conv2d(x1, 32, (3, 3), padding='same')
-        x2 = tf.layers.batch_normalization(x2,
-                                           training=placeholders['training'],
-                                           name='bn2')
-        x2 = tf.nn.relu(x2)
-        x2 = tf.layers.conv2d(x2, 32, (3, 3), padding='same')
-        x2 = tf.layers.batch_normalization(x2,
-                                           training=placeholders['training'],
-                                           name='bn3')
-        x2 = tf.nn.relu(x2)
-        x2 = tf.concat([x1, x1], axis=-1) + x2
-        x2 = tf.layers.max_pooling2d(x2, (1, 3), (1, 3), padding='same')
+        res_input = tf.layers.conv1d(x, 64, 7,
+                                     padding='same')
+        res_input = weighted_batch_normalization(
+            res_input,
+            training=placeholders['training'],
+            weights=broadcast(mask, tf.shape(res_input)),
+            axis=-1,
+            name='bn-init')
+        # res_input = tf.layers.batch_normalization(
+        #     res_input,
+        #     training=placeholders['training'],
+        #     name=('bn-init-1'))
 
-        x3 = tf.layers.conv2d(x2, 64, (3, 3), padding='same')
-        x3 = tf.layers.batch_normalization(x3,
-                                           training=placeholders['training'],
-                                           name='bn4')
-        x3 = tf.nn.relu(x3)
-        x3 = tf.layers.conv2d(x3, 64, (3, 3), padding='same')
-        x3 = tf.layers.batch_normalization(x3,
-                                           training=placeholders['training'],
-                                           name='bn5')
-        x3 = tf.nn.relu(x3)
-        x3 = tf.concat([x2, x2], axis=-1) + x3
-        x3 = tf.layers.max_pooling2d(x3, (1, 3), (1, 3), padding='same')
+        res_input = tf.nn.relu(res_input)
 
-        x_cnn = tf.reshape(x3, (tf.shape(x3)[0], tf.shape(x3)[1],
-                                math.ceil(self._data_shape[-1] / 3 / 3 / 3) * 64))
+        n_filters = 64
+        # resnet
+        for l in range(8):
+            x = tf.layers.conv1d(res_input, n_filters, 7,
+                                 padding='same')
+            # x = tf.layers.batch_normalization(
+            #     x,
+            #     training=placeholders['training'],
+            #     name=('bn-%d-1' % l))
+            x = weighted_batch_normalization(
+                x,
+                training=placeholders['training'],
+                weights=broadcast(mask, tf.shape(x)),
+                name=('bn-%d-1' % l))
 
-        # bi-direction cells
-        with tf.variable_scope('RNN-Cell-fw'):
-            rnn_cell_fw = tf.nn.rnn_cell.GRUCell(75)
-        with tf.variable_scope('RNN-Cell-bw'):
-            rnn_cell_bw = tf.nn.rnn_cell.GRUCell(75)
-        rnn_outputs = \
-            tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
-                                            rnn_cell_bw,
-                                            x_cnn,
-                                            sequence_length=lengths,
-                                            dtype=tf.float32)[0]
-        rnn_outputs = tf.concat(rnn_outputs, axis=-1)
+            x = tf.nn.relu(x)
+            x = tf.layers.dropout(x, 0.1,
+                                  training=placeholders['training'])
 
-        logits = tf.layers.conv1d(rnn_outputs,
+            x = tf.layers.conv1d(x, n_filters, 7,
+                                 padding='same')
+            # x = x + tf.concat([res_input, res_input], axis=-1)
+            x = x + res_input
+
+            # x = tf.layers.batch_normalization(
+            #     x,
+            #     training=placeholders['training'],
+            #     name=('bn-%d-2' % l))
+            x = weighted_batch_normalization(
+                x,
+                training=placeholders['training'],
+                weights=broadcast(mask, tf.shape(x)),
+                name='bn-%d-2' % l)
+
+            res_input = tf.nn.relu(x)
+            res_input = tf.layers.dropout(x, 0.1,
+                                          training=placeholders['training'])
+            # n_filters *= 2
+
+        logits = tf.layers.conv1d(res_input,
                                   self._n_classes,
                                   1)
         return placeholders, logits
@@ -88,3 +94,8 @@ class RNNCNNClassifier(TFClassifierBase):
         return tf.losses.sparse_softmax_cross_entropy(placeholder_y * mask,
                                                       logits,
                                                       mask)
+
+
+def broadcast(x, shape):
+    return tf.reshape(tf.cast(x, tf.float32),
+                      (tf.shape(x)[0], tf.shape(x)[1], 1)) + tf.zeros(shape)

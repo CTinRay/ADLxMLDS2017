@@ -13,8 +13,8 @@ class WeightedBatchNormalization(BatchNormalization):
     """
 
     def __init__(self, weights=1, **kwargs):
-        super(WeightedBatchNormalization, self).__init__(**kwargs)
         self.moments_weights = weights
+        super(WeightedBatchNormalization, self).__init__(**kwargs)
 
     def call(self, inputs, training=False):
         if self.fused:
