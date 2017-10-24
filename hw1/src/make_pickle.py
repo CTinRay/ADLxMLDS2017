@@ -14,10 +14,12 @@ def main():
                         help='Filename of pickle to store mean and std')
     parser.add_argument('--test_only', type=bool, default=False,
                         help='Whether or not only read test data.')
+    parser.add_argument('--feature', type=str, default='mfcc',
+                        help='mfcc or fbank')
     args = parser.parse_args()
 
     print('Processing data.', file=sys.stderr)
-    dp = DataProcessor(args.path)
+    dp = DataProcessor(args.path, feature=args.feature)
 
     print('Start dumping pickle.', file=sys.stderr)
     with open(args.out, 'wb') as f:
