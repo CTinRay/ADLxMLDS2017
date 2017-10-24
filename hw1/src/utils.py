@@ -1,4 +1,5 @@
 import os
+import pickle
 import re
 import pandas as pd
 import numpy as np
@@ -6,7 +7,8 @@ import pdb
 
 
 class DataProcessor:
-    def _get_data(self, filename, sort=True):
+    def _get_data(self, filename,
+                  preserve_order=False):
         df = pd.read_csv(filename,
                          delim_whitespace=True,
                          header=None)
@@ -28,9 +30,15 @@ class DataProcessor:
         df.columns = df.columns.swaplevel(0, 1)
         df.sort_index(axis=1, level=0, inplace=True)
 
-        if sort:
-            # sort by sentence id
-            df.sort_index(axis=0, inplace=True)
+        # sort by sentence id
+        df.sort_index(axis=0, inplace=True)
+
+        if preserve_order:
+            sentence_ids_unique = [sentence_ids[0]]
+            for sid in sentence_ids[1:]:
+                if sid != sentence_ids_unique[-1]:
+                    sentence_ids_unique.append(sid)
+            df = df.reindex(sentence_ids_unique)
 
         # reuturn 3d matrix
         return df.as_matrix().reshape(df.shape[0],
@@ -63,7 +71,7 @@ class DataProcessor:
 
         return df.as_matrix().astype(int)
 
-    def __init__(self, path, test_only=False):
+    def __init__(self, path, test_only=False, mean_var_file=None):
 
         # make phone tables
         self.phone_map48 = {}
@@ -83,7 +91,8 @@ class DataProcessor:
             for row in f:
                 phone = row.split()[0]
                 char = row.split()[2]
-                self.phone_char_map[self.phone_map48[phone]] = char
+                if phone in self.phone_map39:
+                    self.phone_char_map[self.phone_map48[phone]] = char
 
         if not test_only:
             self.train = {}
@@ -92,15 +101,39 @@ class DataProcessor:
             self.train['y'] = \
                 self._get_label(os.path.join(path, 'label', 'train.lab'))
 
+            # self.train['x'] = np.concatenate(
+            #     (self.train['x'],
+            #      np.diff(self.train['x'], 1, -1),
+            #      np.diff(self.train['x'], 2, -1)),
+            #     axis=-1)
+
+            phones = self.train['x'].reshape((-1, self.train['x'].shape[-1]))
+            phones = phones[~np.isnan(phones[:, 1])]
+            self.mean = np.mean(phones, axis=0)
+            self.std = np.std(phones, axis=0)
+
+            self.train['x'] = (self.train['x'] - self.mean) / self.std
+
             indices = np.arange(self.train['x'].shape[0])
             np.random.shuffle(indices)
             self.train['x'] = self.train['x'][indices]
             self.train['y'] = self.train['y'][indices]
+        else:
+            with open(mean_var_file, 'rb') as f:
+                mean_var = pickle.load(f)
+                self.mean = mean_var['mean']
+                self.std = mean_var['std']
 
         self.test = {}
         self.test['x'] = \
             self._get_data(os.path.join(path, 'fbank', 'test.ark'),
-                           sort=False)
+                           preserve_order=True)
+        # self.test['x'] = np.concatenate(
+        #         (self.test['x'],
+        #          np.diff(self.test['x'], 1, -1),
+        #          np.diff(self.test['x'], 2, -1)),
+        #         axis=-1)
+        self.test['x'] = (self.test['x'] - self.mean) / self.std
 
     def get_train_valid(self, valid_ratio=0.2):
         n_valid = int(self.train['x'].shape[0] * valid_ratio)
@@ -133,3 +166,20 @@ class DataProcessor:
         seqs = list(map(lambda x: pattern.sub('', x), seqs))
 
         return seqs
+
+    def write_predict(self, seqs, path, out):
+        df = pd.read_csv(os.path.join(path, 'mfcc', 'test.ark'),
+                         delim_whitespace=True,
+                         header=None)
+        ids = df[0]
+        sentence_ids = \
+            list(map(lambda x: '_'.join(x.split('_')[:-1]), ids))
+        sentence_ids_unique = [sentence_ids[0]]
+
+        for sid in sentence_ids[1:]:
+            if sid != sentence_ids_unique[-1]:
+                sentence_ids_unique.append(sid)
+
+        df = pd.DataFrame(seqs, index=sentence_ids_unique)
+        df.index.name = 'id'
+        df.to_csv(out, header=['phone_sequence'])

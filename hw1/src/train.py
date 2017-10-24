@@ -7,6 +7,7 @@ import numpy as np
 from callbacks import ModelCheckpoint
 from rnn import RNNClassifier
 from rnn_cnn import RNNCNNClassifier
+from utils import DataProcessor
 
 
 def main():
@@ -29,6 +30,7 @@ def main():
 
     with open(args.data, 'rb') as f:
         data_processor = pickle.load(f)
+    # data_processor = DataProcessor(args.data)
 
     train, valid = data_processor.get_train_valid()
     # test = data_processor.get_test()
@@ -43,7 +45,7 @@ def main():
                                   valid=valid,
                                   n_epochs=args.n_epochs,
                                   gpu_memory_fraction=args.gpu_mem)
-    
+
     model_checkpoint = ModelCheckpoint(args.path,
                                        'accuracy', 1, 'max')
     clf.fit(train['x'], train['y'],

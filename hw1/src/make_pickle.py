@@ -10,6 +10,8 @@ def main():
     parser = argparse.ArgumentParser(description='Load data as pickle')
     parser.add_argument('path', type=str, help='Data directory path')
     parser.add_argument('out', type=str, help='Filename of output pickle')
+    parser.add_argument('mean_std', type=str,
+                        help='Filename of pickle to store mean and std')
     parser.add_argument('--test_only', type=bool, default=False,
                         help='Whether or not only read test data.')
     args = parser.parse_args()
@@ -20,6 +22,11 @@ def main():
     print('Start dumping pickle.', file=sys.stderr)
     with open(args.out, 'wb') as f:
         pickle.dump(dp, f)
+
+    with open(args.mean_std, 'wb') as f:
+        pickle.dump({
+            'mean': dp.mean,
+            'std': dp.std}, f)
 
 
 if __name__ == '__main__':

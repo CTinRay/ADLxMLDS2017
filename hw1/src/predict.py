@@ -22,6 +22,9 @@ def main():
     parser = argparse.ArgumentParser(description='ADL HW1')
     parser.add_argument('data', type=str, help='Pickle made by make_pickle.py')
     parser.add_argument('path', type=str, help='Path for model')
+    parser.add_argument('raw_data_path', type=str,
+                        help='Path for raw data directory')
+    parser.add_argument('predict', type=str, help='Predict file')
     parser.add_argument('--model', type=str,
                         help='model type', default='rnn')
     parser.add_argument('--gpu_mem', type=float,
@@ -39,7 +42,6 @@ def main():
     n_classes = np.max(train['y']) + 1
     clf = classifiers[args.model](train['x'].shape, n_classes,
                                   gpu_memory_fraction=args.gpu_mem)
-    
     clf.load(args.path)
 
     valid['y_'] = clf.predict(valid['x'])
@@ -48,6 +50,12 @@ def main():
 
     print('mean distance = %f', mean_distance(valid['seqs'], valid['seqs_']))
 
+    test = data_processor.get_test()
+    test['y_'] = clf.predict(test['x'])
+    test['seqs_'] = data_processor.int_to_char(test['y_'], test['x'])
+    data_processor.write_predict(test['seqs_'],
+                                 args.raw_data_path,
+                                 args.predict)
     pdb.set_trace()
 
 
