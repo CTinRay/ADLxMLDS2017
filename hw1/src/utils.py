@@ -71,7 +71,8 @@ class DataProcessor:
 
         return df.as_matrix().astype(int)
 
-    def __init__(self, path, test_only=False, mean_var_file=None):
+    def __init__(self, path, test_only=False, mean_var_file=None,
+                 feature='fbank'):
 
         # make phone tables
         self.phone_map48 = {}
@@ -97,7 +98,7 @@ class DataProcessor:
         if not test_only:
             self.train = {}
             self.train['x'] = \
-                self._get_data(os.path.join(path, 'fbank', 'train.ark'))
+                self._get_data(os.path.join(path, feature, 'train.ark'))
             self.train['y'] = \
                 self._get_label(os.path.join(path, 'label', 'train.lab'))
 
@@ -126,7 +127,7 @@ class DataProcessor:
 
         self.test = {}
         self.test['x'] = \
-            self._get_data(os.path.join(path, 'fbank', 'test.ark'),
+            self._get_data(os.path.join(path, feature, 'test.ark'),
                            preserve_order=True)
         # self.test['x'] = np.concatenate(
         #         (self.test['x'],
