@@ -46,7 +46,7 @@ class RNNCNNClassifier(TFClassifierBase):
 
         n_filters = 64
         # resnet
-        for l in range(8):
+        for l in range(4):
             x = tf.layers.conv1d(res_input, n_filters, 7,
                                  padding='same')
             # x = tf.layers.batch_normalization(
@@ -83,7 +83,22 @@ class RNNCNNClassifier(TFClassifierBase):
                                           training=placeholders['training'])
             # n_filters *= 2
 
-        logits = tf.layers.conv1d(res_input,
+        # bi-direction cells
+        with tf.variable_scope('bi-rnn3'):
+            with tf.variable_scope('RNN-Cell-fw2'):
+                rnn_cell_fw = tf.nn.rnn_cell.LSTMCell(128)
+            with tf.variable_scope('RNN-Cell-bw2'):
+                rnn_cell_bw = tf.nn.rnn_cell.LSTMCell(128)
+
+            rnn_outputs = \
+                tf.nn.bidirectional_dynamic_rnn(rnn_cell_fw,
+                                                rnn_cell_bw,
+                                                res_input,
+                                                sequence_length=lengths,
+                                                dtype=tf.float32)[0]
+            rnn_outputs = tf.concat(rnn_outputs, axis=-1)
+
+        logits = tf.layers.conv1d(rnn_outputs,
                                   self._n_classes,
                                   1)
         return placeholders, logits
