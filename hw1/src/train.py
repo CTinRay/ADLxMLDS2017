@@ -4,9 +4,10 @@ import pickle
 import sys
 import traceback
 import numpy as np
-from callbacks import ModelCheckpoint
+from callbacks import ModelCheckpoint, EditDistance
 from rnn import RNNClassifier
 from rnn_cnn import RNNCNNClassifier
+from cnn import CNNClassifier
 from utils import DataProcessor
 
 
@@ -37,7 +38,8 @@ def main():
 
     classifiers = {
         'rnn': RNNClassifier,
-        'rnncnn': RNNCNNClassifier}
+        'rnncnn': RNNCNNClassifier,
+        'cnn': CNNClassifier}
 
     n_classes = np.max(train['y']) + 1
     clf = classifiers[args.model](train['x'].shape, n_classes,
@@ -48,8 +50,9 @@ def main():
 
     model_checkpoint = ModelCheckpoint(args.path,
                                        'accuracy', 1, 'max')
+    editdistance = EditDistance(valid, data_processor)
     clf.fit(train['x'], train['y'],
-            [model_checkpoint])
+            [model_checkpoint, editdistance])
 
 
 if __name__ == '__main__':

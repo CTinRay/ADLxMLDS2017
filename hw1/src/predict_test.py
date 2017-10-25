@@ -7,6 +7,7 @@ import editdistance
 import numpy as np
 from rnn import RNNClassifier
 from rnn_cnn import RNNCNNClassifier
+from cnn import CNNClassifier
 from utils import DataProcessor
 
 
@@ -43,7 +44,8 @@ def main():
     test = data_processor.get_test()
     classifiers = {
         'rnn': RNNClassifier,
-        'rnncnn': RNNCNNClassifier}
+        'rnncnn': RNNCNNClassifier,
+        'cnn': CNNClassifier}
 
     n_classes = 39
     clf = classifiers[args.model](test['x'].shape, n_classes,

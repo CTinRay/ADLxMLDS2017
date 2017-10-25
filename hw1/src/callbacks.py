@@ -1,4 +1,6 @@
 import math
+import editdistance
+import numpy as np
 
 
 class Callback:
@@ -35,3 +37,23 @@ class ModelCheckpoint(Callback):
                 model.save(self._filepath)
                 if self._verbose > 0:
                     print('Best model saved (%f)' % score)
+
+
+class EditDistance(Callback):
+    def _mean_distance(self, truth, pred):
+        return np.mean(
+            list(
+                map(lambda t, p: editdistance.eval(t, p),
+                    truth, pred)
+            )
+        )
+
+    def __init__(self, valid, data_processor):
+        self._valid = valid
+        self._dp = data_processor
+        self._seqs = data_processor.int_to_char(valid['y'], valid['x'])
+
+    def on_epoch_end(self, log_train, log_valid, model):
+        y_ = model.predict(self._valid['x'])
+        seqs_ = self._dp.int_to_char(y_, self._valid['x'])
+        print('editdistance %f' % self._mean_distance(self._seqs, seqs_))
