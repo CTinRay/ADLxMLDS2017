@@ -46,7 +46,7 @@ class RNNCNNClassifier(TFClassifierBase):
 
         n_filters = 64
         # resnet
-        for l in range(4):
+        for l in range(8):
             x = tf.layers.conv1d(res_input, n_filters, 7,
                                  padding='same')
             # x = tf.layers.batch_normalization(
