@@ -32,7 +32,7 @@ class TorchWrapper():
                 self._optimizer.step()
 
             # predict = outputs.argmax
-            # loss += batch_loss
+            loss += batch_loss.data[0]
             # for metric, func in self._metrics.items():
             #     metric_scores[metric] += func(
 
@@ -72,7 +72,7 @@ class TorchWrapper():
                 batch_size=self._batch_size,
                 shuffle=True,
                 collate_fn=padding_collate,
-                num_workers=0)
+                num_workers=1)
             log_train = self._iter(dataloader, True)
 
             # evaluate valid score

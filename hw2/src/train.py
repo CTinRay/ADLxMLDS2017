@@ -41,8 +41,10 @@ def main():
     word_dim = data_processor.get_word_dim()
     class_weights = torch.ones(word_dim)
     class_weights[0] = 0
-    clf = TorchWrapper(archs[args.arch](frame_dim, word_dim),
-                       torch.nn.CrossEntropyLoss(class_weights),
+    arch = archs[args.arch](frame_dim, word_dim)
+    arch.cuda()
+    clf = TorchWrapper(arch,
+                       torch.nn.CrossEntropyLoss(class_weights.cuda()),
                        batch_size=args.batch_size,
                        valid=test,
                        n_epochs=args.n_epochs,

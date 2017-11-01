@@ -1,7 +1,9 @@
 import torch
 from torch.autograd import Variable
+import pdb
 
 
+use_cuda = torch.cuda.is_available()
 class S2VD(torch.nn.Module):
     def __init__(self, frame_dim, word_dim, hidden_size=256):
         super(S2VD, self).__init__()
@@ -29,7 +31,7 @@ class S2VD(torch.nn.Module):
         video_lengths = torch.sum(torch.sum(batch['x'], dim=-1) > 0,
                                   dim=-1).tolist()
 
-        batch['x'] = Variable(batch['x'])
+        batch['x'] = Variable(batch['x'].cuda())
         # encode video
         packed = torch.nn.utils.rnn.pack_padded_sequence(
             batch['x'].transpose(0, 1), video_lengths)
@@ -41,7 +43,7 @@ class S2VD(torch.nn.Module):
         padding = torch.zeros(outputs.data.shape[0],
                               outputs.data.shape[1],
                               self._word_dim)
-        padding = Variable(padding)
+        padding = Variable(padding.cuda())
         outputs = torch.cat([outputs, padding], dim=-1)
 
         # prepare for caption
@@ -55,13 +57,13 @@ class S2VD(torch.nn.Module):
                             max(batch['lengths']),
                             self._word_dim)
         probs[0, :, 1] = 1
-        probs = Variable(probs)
+        probs.cuda()
 
-        loss = Variable(torch.zeros(1))
+        loss = Variable(torch.zeros(1).cuda())
 
         # make padding padding for video
         padding = Variable(torch.zeros(1, batch_size,
-                                       self._frame_dim))
+                                       self._frame_dim).cuda())
         for i in range(1, max(batch['lengths'])):
             outputs, hidden_video = self.gru_video(padding, hidden_video)
 
@@ -69,19 +71,16 @@ class S2VD(torch.nn.Module):
             prev_label = torch.zeros(1, batch_size, self._word_dim)
             prev_label.scatter_(2, batch['y'][i - 1].view(1, -1, 1),
                                 torch.ones(1, batch_size, 1))
-            prev_label = Variable(prev_label)
+            prev_label = Variable(prev_label.cuda())
 
             # predict word
             outputs, hidden_caption = \
                 self.gru_caption(torch.cat([outputs, prev_label], dim=-1),
                                  hidden_video)
-            probs[:, i] = self.linear_out(outputs)
-            loss = loss_func(probs[:, i], Variable(batch['y'][i]))
+            prob_i = self.linear_out(outputs)
+            loss = loss + loss_func(prob_i[0], Variable(batch['y'][i].cuda()))
+            probs[:, i] = prob_i.data
 
-        # loss /= sum(batch['lengths'])
+        loss /= sum(batch['lengths'])
 
         return probs, loss
-
-
-# def loss(predicts, labels):
-    
