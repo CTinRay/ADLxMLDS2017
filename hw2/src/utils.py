@@ -5,24 +5,30 @@ import torch
 import numpy as np
 from bleu_eval import BLEU
 from torch.utils.data import Dataset
+import pdb
 
 
 class MSVDDataset(Dataset):
     def __init__(self, data_dir, labels=None):
-        self._ids = os.listdir(data_dir)
+        self._base = os.path.join(data_dir, 'feat')
+        self._files = os.listdir(self._base)
         self._labels = labels
 
     def __len__(self):
-        return len(self._ids)
+        return len(self._files)
 
     def __getitem__(self, idx):
         item = {}
-        item['x'] = np.load(self._ids[idx])
+        item['x'] = np.load(os.path.join(self._base, self._files[idx]))
+        item['x'] = item['x'].astype(np.float32)
 
         if self._labels is not None:
-            # n_captions = len(self._labels[idx])
-            # cap_index = np.random.randint(0, n_captions)
-            item['y'] = self._labels[idx]
+            vid = self._files[idx].replace('.npy', '')
+            n_captions = len(self._labels[vid])
+            cap_index = np.random.randint(0, n_captions)
+            item['y'] = self._labels[vid][cap_index]
+            item['lengths'] = len(item['y'])
+            # item['lengths'] = list(map(len, self._labels[idx][cap_index]))
 
         return item
 
@@ -48,8 +54,8 @@ class DataProcessor:
         return tokens
 
     def _make_dict(self, labels):
-        self._dict = {'': 0}
-        self._word_list = ['']
+        self._dict = {'<pad>': 0, '<eos>': 1, '<sos>': 2, '<unk>': 3}
+        self._word_list = ['<pad>', '<eos>', '<sos>', '<unk>']
         for label in labels:
             for caption in label['caption']:
                 caption = self._filter(caption)
@@ -63,9 +69,10 @@ class DataProcessor:
 
     def _sentence_to_indices(self, sentence):
         sentence = self._filter(sentence)
+        sentence = '<eos> ' + sentence + ' <sos>'
         tokens = self._tokenize(sentence)
         indices = list(map(lambda token: self._dict[token]
-                           if token in self._dict else 0, tokens))
+                           if token in self._dict else 2, tokens))
         return indices
 
     def _json_obj_to_dict(self, jobj):
@@ -93,14 +100,18 @@ class DataProcessor:
         self.test_labels = self._json_obj_to_dict(test_labels)
 
     def get_train_dataset(self, path):
-        return MSVDDataset(self,
-                           os.path.join(path, 'training_data'),
+        return MSVDDataset(os.path.join(path, 'training_data'),
                            self.train_labels)
 
     def get_test_dataset(self, path):
-        return MSVDDataset(self,
-                           os.path.join(path, 'testing_data'),
+        return MSVDDataset(os.path.join(path, 'testing_data'),
                            self.test_labels)
+
+    def get_word_dim(self):
+        return len(self._word_list)
+
+    def get_frame_dim(self):
+        return 4096
 
 
 def calc_bleu(predict, labels):
