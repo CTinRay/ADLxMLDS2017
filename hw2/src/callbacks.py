@@ -36,3 +36,18 @@ class ModelCheckpoint(Callback):
                 model.save(self._filepath)
                 if self._verbose > 0:
                     print('Best model saved (%f)' % score)
+
+
+class PrintPredict(Callback):
+    def __init__(self, dataset, data_processor):
+        self._dataset = dataset
+        self._data_processor = data_processor
+
+    def on_epoch_end(self, log_train, log_valid, model):
+        data = [self._dataset[0]]
+        predicts = model.predict_dataset(data)
+
+        for i in range(predicts.shape[0]):
+            print('id = {}, predict = {}'.format(
+                data[i]['id'],
+                self._data_processor.indices_to_sentence(predicts[i])))

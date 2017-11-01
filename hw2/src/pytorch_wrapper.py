@@ -93,40 +93,37 @@ class TorchWrapper():
 
             self._epoch += 1
 
-    def predict_dataset_prob(self, data, batch_size=None):
+    def predict_dataset(self, data, batch_size=None):
         if batch_size is None:
             batch_size = self._batch_size
 
         dataloader = torch.utils.data.DataLoader(
             data,
             batch_size=batch_size,
-            shuffle=True,
+            shuffle=False,
             collate_fn=padding_collate,
             num_workers=1)
 
-        y_prob = None
+        y_ = None
         for batch in dataloader:
-            batch_y_prob = self._model.forward(batch['x'])
-            if y_prob is None:
-                y_prob = batch_y_prob
+            batch_y_, _ = self._model.forward(self._loss,
+                                              batch, False, self._epoch)
+            if y_ is None:
+                y_ = batch_y_
             else:
-                if batch_y_prob.shape[-1] < y_prob.shape[-1]:
-                    widths = [0] * len(y_prob.shape)
-                    widths[-1] = y_prob.shape[-1] - batch_y_prob.shape[-1]
-                    batch_y_prob = np.pad(batch_y_prob, widths)
-                elif batch_y_prob.shape[-1] > y_prob.shape[-1]:
-                    widths = [0] * len(y_prob.shape)
-                    widths[-1] = batch_y_prob.shape[-1] - y_prob.shape[-1]
-                    y_prob = np.pad(y_prob, widths)
+                if batch_y_.shape[-1] < y_.shape[-1]:
+                    widths = [0] * len(y_.shape)
+                    widths[-1] = y_.shape[-1] - batch_y_.shape[-1]
+                    batch_y_ = np.pad(batch_y_, widths)
+                elif batch_y_.shape[-1] > y_.shape[-1]:
+                    widths = [0] * len(y_.shape)
+                    widths[-1] = batch_y_.shape[-1] - y_.shape[-1]
+                    y_ = np.pad(y_, widths)
 
-                y_prob = np.concatenate([y_prob, batch_y_prob],
-                                        axis=0)
+                y_ = np.concatenate([y_, batch_y_],
+                                    axis=0)
 
-        return y_prob
-
-    def predict(self, X, batch_size=24):
-        prob = self.predict_prob(X)
-        return np.argmax(prob, axis=-1)
+        return y_.numpy().astype(int)
 
     def save(self, path):
         torch.save({

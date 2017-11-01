@@ -22,8 +22,10 @@ class MSVDDataset(Dataset):
         item['x'] = np.load(os.path.join(self._base, self._files[idx]))
         item['x'] = item['x'].astype(np.float32)
 
+        vid = self._files[idx].replace('.npy', '')
+        item['id'] = vid
+
         if self._labels is not None:
-            vid = self._files[idx].replace('.npy', '')
             n_captions = len(self._labels[vid])
             cap_index = np.random.randint(0, n_captions)
             item['y'] = self._labels[vid][cap_index]
@@ -69,7 +71,7 @@ class DataProcessor:
 
     def _sentence_to_indices(self, sentence):
         sentence = self._filter(sentence)
-        sentence = '<eos> ' + sentence + ' <sos>'
+        sentence = '<sos> ' + sentence + ' <eos>'
         tokens = self._tokenize(sentence)
         indices = list(map(lambda token: self._dict[token]
                            if token in self._dict else 2, tokens))
@@ -112,6 +114,9 @@ class DataProcessor:
 
     def get_frame_dim(self):
         return 4096
+
+    def indices_to_sentence(self, indices):
+        return ' '.join([self._word_list[index] for index in indices])
 
 
 def calc_bleu(predict, labels):

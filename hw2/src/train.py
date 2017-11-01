@@ -4,7 +4,7 @@ import pickle
 import sys
 import traceback
 import numpy as np
-from callbacks import ModelCheckpoint
+from callbacks import ModelCheckpoint, PrintPredict
 from pytorch_wrapper import TorchWrapper
 from s2vd import S2VD
 import torch.nn
@@ -52,7 +52,8 @@ def main():
 
     model_checkpoint = ModelCheckpoint(args.model_path,
                                        'loss', 1, 'min')
-    clf.fit_dataset(train, [model_checkpoint])
+    print_predict = PrintPredict(train, data_processor)
+    clf.fit_dataset(train, [model_checkpoint, print_predict])
 
 
 if __name__ == '__main__':

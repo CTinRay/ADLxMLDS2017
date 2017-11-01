@@ -53,11 +53,10 @@ class S2VD(torch.nn.Module):
         outputs, hidden_video = self.gru_caption(packed, hidden_caption)
 
         # init prev_pred with <sos>
-        probs = torch.zeros(batch_size,
-                            max(batch['lengths']),
-                            self._word_dim)
-        probs[0, :, 1] = 1
-        probs.cuda()
+        predicts = torch.zeros(batch_size,
+                               max(batch['lengths']))
+        predicts[:, 0] = 1
+        predicts.cuda()
 
         loss = Variable(torch.zeros(1).cuda())
 
@@ -77,10 +76,10 @@ class S2VD(torch.nn.Module):
             outputs, hidden_caption = \
                 self.gru_caption(torch.cat([outputs, prev_label], dim=-1),
                                  hidden_video)
-            prob_i = self.linear_out(outputs)
-            loss = loss + loss_func(prob_i[0], Variable(batch['y'][i].cuda()))
-            probs[:, i] = prob_i.data
+            prob = self.linear_out(outputs)[0]
+            loss = loss + loss_func(prob, Variable(batch['y'][i].cuda()))
+            _, predicts[:, i] = torch.max(prob.data, -1)
 
         loss /= sum(batch['lengths'])
 
-        return probs, loss
+        return predicts, loss
