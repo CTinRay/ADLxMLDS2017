@@ -74,7 +74,7 @@ class DataProcessor:
         sentence = '<sos> ' + sentence + ' <eos>'
         tokens = self._tokenize(sentence)
         indices = list(map(lambda token: self._dict[token]
-                           if token in self._dict else 2, tokens))
+                           if token in self._dict else 3, tokens))
         return indices
 
     def _json_obj_to_dict(self, jobj):
