@@ -4,22 +4,27 @@ import pdb
 
 
 use_cuda = torch.cuda.is_available()
+
+
 class S2VD(torch.nn.Module):
-    def __init__(self, frame_dim, word_dim, hidden_size=768):
+    def __init__(self, frame_dim, word_dim, hidden_size=1024,
+                 embedding_dim=500):
         super(S2VD, self).__init__()
 
-        self.gru_video = torch.nn.GRU(frame_dim,
-                                      hidden_size,
-                                      1,
-                                      bidirectional=False)
-        self.gru_caption = torch.nn.GRU(hidden_size + word_dim,
+        self.lstm_video = torch.nn.LSTM(frame_dim,
                                         hidden_size,
                                         1,
                                         bidirectional=False)
+        self.lstm_caption = torch.nn.LSTM(hidden_size + embedding_dim,
+                                          hidden_size,
+                                          1,
+                                          bidirectional=False)
         self.linear_out = torch.nn.Linear(hidden_size, word_dim)
+        self.embedding = torch.nn.Embedding(word_dim, embedding_dim)
         self._frame_dim = frame_dim
         self._word_dim = word_dim
         self._hidden_size = hidden_size
+        self._embedding_dim = embedding_dim
 
         class_weights = torch.ones(word_dim)
         class_weights[0] = 0
@@ -36,13 +41,13 @@ class S2VD(torch.nn.Module):
         packed = torch.nn.utils.rnn.pack_padded_sequence(
             batch['x'].transpose(0, 1), video_lengths)
         hidden_video = None
-        outputs, hidden_video = self.gru_video(packed, hidden_video)
+        outputs, hidden_video = self.lstm_video(packed, hidden_video)
 
         # add padding for text
         outputs, _ = torch.nn.utils.rnn.pad_packed_sequence(outputs)
         padding = torch.zeros(outputs.data.shape[0],
                               outputs.data.shape[1],
-                              self._word_dim)
+                              self._embedding_dim)
         padding = Variable(padding.cuda())
         outputs = torch.cat([outputs, padding], dim=-1)
 
@@ -50,7 +55,7 @@ class S2VD(torch.nn.Module):
         packed = torch.nn.utils.rnn.pack_padded_sequence(
             outputs, video_lengths)
         hidden_caption = None
-        outputs, hidden_video = self.gru_caption(packed, hidden_caption)
+        outputs, hidden_video = self.lstm_caption(packed, hidden_caption)
 
         # init prev_pred with <sos>
         predicts = torch.zeros(batch_size,
@@ -64,18 +69,21 @@ class S2VD(torch.nn.Module):
         padding = Variable(torch.zeros(1, batch_size,
                                        self._frame_dim).cuda())
         for i in range(1, max(batch['lengths'])):
-            outputs, hidden_video = self.gru_video(padding, hidden_video)
+            outputs, hidden_video = self.lstm_video(padding, hidden_video)
 
-            # convert label to one-hot
-            prev_label = torch.zeros(1, batch_size, self._word_dim)
-            prev_label.scatter_(2, batch['y'][i - 1].view(1, -1, 1),
-                                torch.ones(1, batch_size, 1))
-            prev_label = Variable(prev_label.cuda())
+            # convert label to embedding
+            if training:
+                prev_word = self.embedding(
+                    Variable(batch['y'][i - 1].unsqueeze(0).cuda()))
+            else:
+                prev_word = self.embedding(
+                    Variable(torch.Tensor.long(predicts[:, i - 1])
+                             .unsqueeze(0).cuda()))
 
             # predict word
             outputs, hidden_caption = \
-                self.gru_caption(torch.cat([outputs, prev_label], dim=-1),
-                                 hidden_video)
+                self.lstm_caption(torch.cat([outputs, prev_word], dim=-1),
+                                  hidden_video)
             prob = self.linear_out(outputs)[0]
             loss = loss + loss_func(prob, Variable(batch['y'][i].cuda()))
             _, predicts[:, i] = torch.max(prob.data, -1)
