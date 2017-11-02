@@ -5,7 +5,7 @@ import pdb
 
 use_cuda = torch.cuda.is_available()
 class S2VD(torch.nn.Module):
-    def __init__(self, frame_dim, word_dim, hidden_size=256):
+    def __init__(self, frame_dim, word_dim, hidden_size=768):
         super(S2VD, self).__init__()
 
         self.gru_video = torch.nn.GRU(frame_dim,
@@ -55,7 +55,7 @@ class S2VD(torch.nn.Module):
         # init prev_pred with <sos>
         predicts = torch.zeros(batch_size,
                                max(batch['lengths']))
-        predicts[:, 0] = 1
+        predicts[:, 0] = 2
         predicts.cuda()
 
         loss = Variable(torch.zeros(1).cuda())

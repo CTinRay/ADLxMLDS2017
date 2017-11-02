@@ -44,7 +44,8 @@ def main():
     arch = archs[args.arch](frame_dim, word_dim)
     arch.cuda()
     clf = TorchWrapper(arch,
-                       torch.nn.CrossEntropyLoss(class_weights.cuda()),
+                       torch.nn.CrossEntropyLoss(class_weights.cuda(),
+                                                 size_average=False),
                        batch_size=args.batch_size,
                        valid=test,
                        n_epochs=args.n_epochs,
@@ -52,8 +53,11 @@ def main():
 
     model_checkpoint = ModelCheckpoint(args.model_path,
                                        'loss', 1, 'min')
-    print_predict = PrintPredict(train, data_processor)
-    clf.fit_dataset(train, [model_checkpoint, print_predict])
+    print_predict_train = PrintPredict(train, data_processor)
+    print_predict_test = PrintPredict(test, data_processor)
+    clf.fit_dataset(train, [model_checkpoint,
+                            print_predict_train,
+                            print_predict_test])
 
 
 if __name__ == '__main__':
