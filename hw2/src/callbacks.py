@@ -39,12 +39,13 @@ class ModelCheckpoint(Callback):
 
 
 class PrintPredict(Callback):
-    def __init__(self, dataset, data_processor):
+    def __init__(self, dataset, data_processor, n_samples=5):
         self._dataset = dataset
         self._data_processor = data_processor
+        self._n_samples = n_samples
 
     def on_epoch_end(self, log_train, log_valid, model):
-        data = [self._dataset[0]]
+        data = [self._dataset[i] for i in range(self._n_samples)]
         predicts = model.predict_dataset(data)
 
         for i in range(predicts.shape[0]):
