@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torch.autograd import Variable
 import pdb
 
@@ -71,14 +72,17 @@ class S2VD(torch.nn.Module):
         for i in range(1, max(batch['lengths'])):
             outputs, hidden_video = self.lstm_video(padding, hidden_video)
 
+            # flip coins with teach_prob
+            teach_prob = 1 - (epoch / (150 + epoch)) if training else 0
+            if_teach = np.random.binomial(1, teach_prob, batch_size)
+            if_teach = torch.from_numpy(if_teach)
+
+            # take previous label according to if_teach
+            prev_label = batch['y'][i - 1] * if_teach \
+                + torch.Tensor.long(predicts[:, i - 1]) * (1 - if_teach)
             # convert label to embedding
-            if training:
-                prev_word = self.embedding(
-                    Variable(batch['y'][i - 1].unsqueeze(0).cuda()))
-            else:
-                prev_word = self.embedding(
-                    Variable(torch.Tensor.long(predicts[:, i - 1])
-                             .unsqueeze(0).cuda()))
+            prev_word = self.embedding(
+                Variable(prev_label.unsqueeze(0).cuda()))
 
             # predict word
             outputs, hidden_caption = \
