@@ -69,7 +69,7 @@ class TorchS2VT(TorchBase):
             probs, hidden_video, hidden_caption = \
                 self._model.decoder.forward(prev_word,
                                             hidden_video, hidden_caption,
-                                            self._epoch, training)
+                                            training)
 
             # store prediction
             var_predicts = \
@@ -82,3 +82,41 @@ class TorchS2VT(TorchBase):
 
         var_loss = var_loss / sum(batch['caption_len'])
         return var_predicts, var_loss
+
+    def _predict_batch(self, batch):
+        var_x = Variable(batch['x'].transpose(0, 1))
+        batch['video_len'] = batch['video_len'].tolist()
+
+        if self._use_cuda:
+            var_x = var_x.cuda()
+
+        # encode
+        hidden_video, hidden_caption = \
+            self._model.encoder.forward(var_x,
+                                        batch['video_len'],
+                                        False)
+
+        batch_size = batch['x'].shape[0]
+
+        var_predicts = Variable(torch.ones(1, batch_size).long())
+        if self._use_cuda:
+            var_predicts = var_predicts.cuda()
+
+        for i in range(1, max(batch['caption_len'])):
+            # take previous label according to if_teach
+            prev_word = var_predicts[-1, :]
+
+            prev_word = prev_word.detach()
+            # decode
+            probs, hidden_video, hidden_caption = \
+                self._model.decoder.forward(prev_word,
+                                            hidden_video, hidden_caption,
+                                            False)
+
+            # store prediction
+            var_predicts = \
+                torch.cat([var_predicts,
+                           torch.max(probs, -1)[1].unsqueeze(0)],
+                          0)
+
+        return var_predicts.data.cpu().numpy().T

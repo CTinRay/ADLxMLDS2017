@@ -11,6 +11,9 @@ class TorchBase():
     def _run_iter(self, batch, training):
         pass
 
+    def _predict_batch(self, batch):
+        pass
+
     def _run_epoch(self, dataloader, training):
 
         # run batches for train
@@ -103,8 +106,7 @@ class TorchBase():
 
         y_ = None
         for batch in dataloader:
-            batch_y_, _ = self._model.forward(self._loss,
-                                              batch, False, self._epoch)
+            batch_y_ = self._predict_batch(batch)
             if y_ is None:
                 y_ = batch_y_
             else:
@@ -120,7 +122,7 @@ class TorchBase():
                 y_ = np.concatenate([y_, batch_y_],
                                     axis=0)
 
-        return y_.numpy().astype(int)
+        return y_
 
     def save(self, path):
         torch.save({

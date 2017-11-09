@@ -57,10 +57,9 @@ def main(args):
     print_predict_test = PrintPredict(test, data_processor)
 
     # fit
-    clf.fit_dataset(train, [model_checkpoint])
-    # ,
-    #                         print_predict_train,
-    #                         print_predict_test])
+    clf.fit_dataset(train, [model_checkpoint,
+                            print_predict_train,
+                            print_predict_test])
 
 
 if __name__ == '__main__':
