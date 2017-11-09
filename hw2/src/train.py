@@ -3,14 +3,11 @@ import pdb
 import pickle
 import sys
 import traceback
-import numpy as np
 from callbacks import ModelCheckpoint, PrintPredict
-from pytorch_wrapper import TorchWrapper
-from s2vd import S2VD
-import torch.nn
+from pytorch_s2vt import TorchS2VT
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description='ADL HW2')
     parser.add_argument('pickle', type=str,
                         help='Pickle made by make_pickle.py')
@@ -23,46 +20,53 @@ def main():
     parser.add_argument('--batch_size', type=int,
                         help='Batch size', default=128)
     parser.add_argument('--arch', type=str,
-                        help='Network architecture', default='s2vd')
+                        help='Network architecture', default='s2vt')
     parser.add_argument('--gpu_mem', type=float,
                         help='GPU memory fraction', default=0.1)
     args = parser.parse_args()
+    return args
 
+
+def main(args):
+    # load data_processor
     with open(args.pickle, 'rb') as f:
         data_processor = pickle.load(f)
 
+    # get dataset
     train = data_processor.get_train_dataset(args.data_path)
     test = data_processor.get_test_dataset(args.data_path)
 
-    archs = {
-        's2vd': S2VD}
-
     frame_dim = data_processor.get_frame_dim()
     word_dim = data_processor.get_word_dim()
-    class_weights = torch.ones(word_dim)
-    class_weights[0] = 0
-    arch = archs[args.arch](frame_dim, word_dim)
-    arch.cuda()
-    clf = TorchWrapper(arch,
-                       torch.nn.CrossEntropyLoss(class_weights.cuda(),
-                                                 size_average=False),
-                       batch_size=args.batch_size,
-                       valid=test,
-                       n_epochs=args.n_epochs,
-                       gpu_memory_fraction=args.gpu_mem)
 
+    # select model arch
+    archs = {
+        's2vt': TorchS2VT}
+
+    # init classifier
+    clf = archs[args.arch](frame_dim=frame_dim,
+                           word_dim=word_dim,
+                           batch_size=args.batch_size,
+                           valid=test,
+                           n_epochs=args.n_epochs)
+
+    # make callbacks
     model_checkpoint = ModelCheckpoint(args.model_path,
                                        'loss', 1, 'min')
     print_predict_train = PrintPredict(train, data_processor)
     print_predict_test = PrintPredict(test, data_processor)
-    clf.fit_dataset(train, [model_checkpoint,
-                            print_predict_train,
-                            print_predict_test])
+
+    # fit
+    clf.fit_dataset(train, [model_checkpoint])
+    # ,
+    #                         print_predict_train,
+    #                         print_predict_test])
 
 
 if __name__ == '__main__':
     try:
-        main()
+        args = parse_args()
+        main(args)
     except:
         type, value, tb = sys.exc_info()
         traceback.print_exc()

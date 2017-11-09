@@ -7,9 +7,11 @@ from tqdm import tqdm
 import pdb
 
 
-class TorchWrapper():
+class TorchBase():
+    def _run_iter(self, batch, training):
+        pass
 
-    def _iter(self, dataloader, training):
+    def _run_epoch(self, dataloader, training):
 
         # run batches for train
         loss = 0
@@ -21,17 +23,13 @@ class TorchWrapper():
 
         for batch in tqdm(dataloader):
             outputs, batch_loss = \
-                self._model.forward(self._loss, batch, training, self._epoch)
-            # batch_loss = self._loss(Variable(torch.stack(batch['y'])
-            #                                  .transpose(0, 1),
-            #                                  volatile=True),
-            #                         outputs)
+                self._run_iter(batch, training)
+
             if training:
                 self._optimizer.zero_grad()
                 batch_loss.backward()
                 self._optimizer.step()
 
-            # predict = outputs.argmax
             loss += batch_loss.data[0]
             # for metric, func in self._metrics.items():
             #     metric_scores[metric] += func(
@@ -44,22 +42,21 @@ class TorchWrapper():
         print('loss=%f\n' % loss)
         return epoch_log
 
-    def __init__(self, model, loss,
+    def __init__(self,
                  learning_rate=1e-3, batch_size=10,
                  n_epochs=10, valid=None,
                  reg_constant=0.0,
-                 gpu_memory_fraction=0.2):
+                 use_cuda=None):
 
-        self._model = model
-        self._loss = loss
-        self._optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=learning_rate)
+        self._learning_rate = learning_rate
         self._batch_size = batch_size
         self._n_epochs = n_epochs
         self._valid = valid
         self._reg_constant = reg_constant
         self._epoch = 0
+        self._use_cuda = use_cuda \
+            if use_cuda is not None \
+            else torch.cuda.is_available()
 
     def fit_dataset(self, data, callbacks=[]):
         # Start the training loop.
@@ -73,7 +70,7 @@ class TorchWrapper():
                 shuffle=True,
                 collate_fn=padding_collate,
                 num_workers=1)
-            log_train = self._iter(dataloader, True)
+            log_train = self._run_epoch(dataloader, True)
 
             # evaluate valid score
             if self._valid is not None:
@@ -84,7 +81,7 @@ class TorchWrapper():
                     shuffle=True,
                     collate_fn=padding_collate,
                     num_workers=1)
-                log_valid = self._iter(dataloader, False)
+                log_valid = self._run_epoch(dataloader, False)
             else:
                 log_valid = None
 

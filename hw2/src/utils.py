@@ -21,6 +21,7 @@ class MSVDDataset(Dataset):
         item = {}
         item['x'] = np.load(os.path.join(self._base, self._files[idx]))
         item['x'] = item['x'].astype(np.float32)
+        item['video_len'] = np.sum(np.sum(item['x'], axis=-1) > 0)
 
         vid = self._files[idx].replace('.npy', '')
         item['id'] = vid
@@ -29,7 +30,7 @@ class MSVDDataset(Dataset):
             n_captions = len(self._labels[vid])
             cap_index = np.random.randint(0, n_captions)
             item['y'] = self._labels[vid][cap_index]
-            item['lengths'] = len(item['y'])
+            item['caption_len'] = len(item['y'])
             # item['lengths'] = list(map(len, self._labels[idx][cap_index]))
 
         return item
