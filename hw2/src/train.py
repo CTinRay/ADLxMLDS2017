@@ -3,7 +3,7 @@ import pdb
 import pickle
 import sys
 import traceback
-from callbacks import ModelCheckpoint, PrintPredict
+from callbacks import ModelCheckpoint, PrintPredict, CalcBleu
 from pytorch_s2vt import TorchS2VT
 
 
@@ -55,11 +55,13 @@ def main(args):
                                        'loss', 1, 'min')
     print_predict_train = PrintPredict(train, data_processor)
     print_predict_test = PrintPredict(test, data_processor)
+    calc_bleu = CalcBleu(test, data_processor)
 
     # fit
-    clf.fit_dataset(train, [model_checkpoint,
+    clf.fit_dataset(train, [calc_bleu,
                             print_predict_train,
-                            print_predict_test])
+                            print_predict_test,
+                            model_checkpoint])
 
 
 if __name__ == '__main__':
