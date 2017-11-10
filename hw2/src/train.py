@@ -52,7 +52,7 @@ def main(args):
 
     # make callbacks
     model_checkpoint = ModelCheckpoint(args.model_path,
-                                       'loss', 1, 'min')
+                                       'bleu', 1, 'max')
     print_predict_train = PrintPredict(train, data_processor)
     print_predict_test = PrintPredict(test, data_processor)
     calc_bleu = CalcBleu(test, data_processor)
