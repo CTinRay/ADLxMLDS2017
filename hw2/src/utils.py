@@ -123,9 +123,11 @@ class DataProcessor:
         return ' '.join([self._word_list[index] for index in indices])
 
     def postprocess_sentence(self, sentence):
-        return sentence.replace('<sos> ', '') \
-                       .replace(' <eos>', '') \
-                       .replace(' <pad>', '')
+        sentence = sentence.replace('<sos> ', '') \
+          .replace(' <eos>', '') \
+          .replace(' <pad>', '') \
+          .replace(' .', '.')
+        return sentence
 
     def write_predict(self, vids, predicts, filename):
         sentences = \
