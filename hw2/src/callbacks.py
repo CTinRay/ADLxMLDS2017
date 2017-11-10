@@ -61,10 +61,13 @@ class CalcBleu(Callback):
     def __init__(self, dataset, data_processor):
         self._dataset = dataset
         self._data_processor = data_processor
+        self._period = data_processor._dict['.']
 
     def on_epoch_end(self, log_train, log_valid, model):
         ys_ = model.predict_dataset(self._dataset)
-        sentences = [' '.join(map(lambda n: str(n) if n > 3 else '',
+        sentences = [' '.join(map(lambda n: str(n)
+                                  if n > 3 and n != self._period
+                                  else '',
                                   y.tolist()))
                      for y in ys_]
 
@@ -72,7 +75,7 @@ class CalcBleu(Callback):
         for sentence, data in zip(sentences, self._dataset):
             sentence_bleu = 0
             for y in self._data_processor.test_labels[data['id']]:
-                ans = ' '.join(map(str, y[1:-1]))
+                ans = ' '.join(map(str, y[1:-2]))
                 sentence_bleu += BLEU(sentence, ans)
 
             sentence_bleu /= len(self._data_processor.test_labels[data['id']])
