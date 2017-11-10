@@ -9,10 +9,13 @@ import pdb
 
 
 class MSVDDataset(Dataset):
-    def __init__(self, data_dir, labels=None):
+    def __init__(self, data_dir, labels=None, vids=None):
         self._base = os.path.join(data_dir, 'feat')
         self._files = os.listdir(self._base)
         self._labels = labels
+
+        if vids is not None:
+            self._files = [vid + '.npy' for vid in vids]
 
     def __len__(self):
         return len(self._files)
@@ -106,9 +109,9 @@ class DataProcessor:
         return MSVDDataset(os.path.join(path, 'training_data'),
                            self.train_labels)
 
-    def get_test_dataset(self, path):
+    def get_test_dataset(self, path, vids=None):
         return MSVDDataset(os.path.join(path, 'testing_data'),
-                           self.test_labels)
+                           self.test_labels, vids)
 
     def get_word_dim(self):
         return len(self._word_list)
@@ -118,6 +121,13 @@ class DataProcessor:
 
     def indices_to_sentence(self, indices):
         return ' '.join([self._word_list[index] for index in indices])
+
+    def write_predict(self, vids, predicts, filename):
+        sentences = \
+            [self.indices_to_sentence(predict) for predict in predicts]
+        with open(filename, 'w') as f:
+            for vid, sentence in zip(vids, sentences):
+                f.write("%s,%s\n" % (vid, sentence))
 
 
 def calc_bleu(predict, labels):
