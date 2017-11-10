@@ -104,25 +104,21 @@ class TorchBase():
             collate_fn=padding_collate,
             num_workers=1)
 
-        y_ = None
+        ys_ = []
+        max_len = 0
         for batch in dataloader:
             batch_y_ = self._predict_batch(batch)
-            if y_ is None:
-                y_ = batch_y_
-            else:
-                if batch_y_.shape[-1] < y_.shape[-1]:
-                    widths = [0] * len(y_.shape)
-                    widths[-1] = y_.shape[-1] - batch_y_.shape[-1]
-                    batch_y_ = np.pad(batch_y_, widths)
-                elif batch_y_.shape[-1] > y_.shape[-1]:
-                    widths = [0] * len(y_.shape)
-                    widths[-1] = batch_y_.shape[-1] - y_.shape[-1]
-                    y_ = np.pad(y_, widths)
+            ys_.append(batch_y_)
+            max_len = max(batch_y_.shape[1], max_len)
 
-                y_ = np.concatenate([y_, batch_y_],
-                                    axis=0)
+        ys_ = [np.pad(y_,
+                      ((0, 0), (0, max_len - y_.shape[1])),
+                      'constant')
+               for y_ in ys_]
 
-        return y_
+        ys_ = np.concatenate(ys_, axis=0)
+
+        return ys_
 
     def save(self, path):
         torch.save({
