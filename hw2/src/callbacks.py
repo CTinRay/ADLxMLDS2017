@@ -49,6 +49,7 @@ class PrintPredict(Callback):
         predicts = model.predict_dataset(data)
 
         for i in range(predicts.shape[0]):
-            print('id = {}, predict = {}'.format(
+            print('id = {}, predict = {}, label = {}'.format(
                 data[i]['id'],
-                self._data_processor.indices_to_sentence(predicts[i])))
+                self._data_processor.indices_to_sentence(predicts[i]),
+                self._data_processor.indices_to_sentence(data[i]['y'])))
