@@ -55,8 +55,9 @@ class TorchS2VT(TorchBase):
 
         for i in range(1, max(batch['caption_len'])):
             # flip coins with teach_prob
-            teach_prob = 1 - (3 * self._epoch / (150 + 3 * self._epoch)) \
-                         if training else 1
+            # teach_prob = 1 - (3 * self._epoch / (150 + 3 * self._epoch)) \
+            #              if training else 1
+            teach_prob = 1
             if_teach = torch.bernoulli(teach_prob * var_ones)
             if_teach = if_teach.long()
 
@@ -102,7 +103,9 @@ class TorchS2VT(TorchBase):
         if self._use_cuda:
             var_predicts = var_predicts.cuda()
 
-        for i in range(1, max(batch['caption_len'])):
+        if_end = (var_predicts[-1] == 1).data
+
+        while not if_end.all():
             # take previous label according to if_teach
             prev_word = var_predicts[-1, :]
 
@@ -118,5 +121,7 @@ class TorchS2VT(TorchBase):
                 torch.cat([var_predicts,
                            torch.max(probs, -1)[1].unsqueeze(0)],
                           0)
+
+            if_end = if_end | (var_predicts[-1] == 1).data
 
         return var_predicts.data.cpu().numpy().T
