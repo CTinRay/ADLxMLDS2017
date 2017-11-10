@@ -47,7 +47,7 @@ class TorchS2VT(TorchBase):
         var_loss = 0
         batch_size = batch['x'].shape[0]
 
-        var_predicts = Variable(torch.ones(1, batch_size).long())
+        var_predicts = Variable(torch.ones(1, batch_size).long() * 2)
         var_ones = Variable(torch.ones(batch_size))
         if self._use_cuda:
             var_predicts = var_predicts.cuda()
@@ -55,8 +55,8 @@ class TorchS2VT(TorchBase):
 
         for i in range(1, max(batch['caption_len'])):
             # flip coins with teach_prob
-            teach_prob = 1 - (self._epoch / (150 + self._epoch)) \
-                         if training else 0
+            teach_prob = 1 - (3 * self._epoch / (150 + 3 * self._epoch)) \
+                         if training else 1
             if_teach = torch.bernoulli(teach_prob * var_ones)
             if_teach = if_teach.long()
 
@@ -84,7 +84,7 @@ class TorchS2VT(TorchBase):
         return var_predicts, var_loss
 
     def _predict_batch(self, batch):
-        var_x = Variable(batch['x'].transpose(0, 1))
+        var_x = Variable(batch['x'].transpose(0, 1), volatile=True)
         batch['video_len'] = batch['video_len'].tolist()
 
         if self._use_cuda:
@@ -98,7 +98,7 @@ class TorchS2VT(TorchBase):
 
         batch_size = batch['x'].shape[0]
 
-        var_predicts = Variable(torch.ones(1, batch_size).long())
+        var_predicts = Variable(torch.ones(1, batch_size).long() * 2)
         if self._use_cuda:
             var_predicts = var_predicts.cuda()
 
