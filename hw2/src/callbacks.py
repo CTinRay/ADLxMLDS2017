@@ -62,23 +62,29 @@ class CalcBleu(Callback):
         self._dataset = dataset
         self._data_processor = data_processor
         self._period = data_processor._dict['.']
+        self._captions = []
+        for data in dataset:
+            captions = self._data_processor.test_labels[data['id']]
+            captions = [data_processor.indices_to_sentence(caption)
+                        for caption in captions]
+            captions = [data_processor.postprocess_sentence(caption)
+                        for caption in captions]
+            self._captions.append(captions)
 
     def on_epoch_end(self, log_train, log_valid, model):
         ys_ = model.predict_dataset(self._dataset)
-        sentences = [' '.join(map(lambda n: str(n)
-                                  if n > 3 and n != self._period
-                                  else '',
-                                  y.tolist()))
+        sentences = [self._data_processor.indices_to_sentence(y)
                      for y in ys_]
+        sentences = [self._data_processor.postprocess_sentence(sentence)
+                     for sentence in sentences]
 
         bleu = 0
-        for sentence, data in zip(sentences, self._dataset):
+        for sentence, captions in zip(sentences, self._captions):
             sentence_bleu = 0
-            for y in self._data_processor.test_labels[data['id']]:
-                ans = ' '.join(map(str, y[1:-2]))
-                sentence_bleu += BLEU(sentence, ans)
+            for y in captions:
+                sentence_bleu += BLEU(sentence, y)
 
-            sentence_bleu /= len(self._data_processor.test_labels[data['id']])
+            sentence_bleu /= len(captions)
             bleu += sentence_bleu
 
         bleu /= len(self._dataset)
