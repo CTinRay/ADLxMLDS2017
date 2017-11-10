@@ -122,9 +122,16 @@ class DataProcessor:
     def indices_to_sentence(self, indices):
         return ' '.join([self._word_list[index] for index in indices])
 
+    def postprocess_sentence(self, sentence):
+        return sentence.replace('<sos> ', '') \
+                       .replace(' <eos>', '') \
+                       .replace(' <pad>', '')
+
     def write_predict(self, vids, predicts, filename):
         sentences = \
             [self.indices_to_sentence(predict) for predict in predicts]
+        sentences = \
+            [self.postprocess_sentence(sentence) for sentence in sentences]
         with open(filename, 'w') as f:
             for vid, sentence in zip(vids, sentences):
                 f.write("%s,%s\n" % (vid, sentence))
