@@ -135,7 +135,7 @@ class TorchBase():
         checkpoint = torch.load(path)
         self._epoch = checkpoint['epoch']
         self._model.load_state_dict(checkpoint['model'])
-        self._optimize.load_state_dict(checkpoint['optimizer'])
+        self._optimizer.load_state_dict(checkpoint['optimizer'])
 
 
 numpy_type_map = {
