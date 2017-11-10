@@ -50,7 +50,6 @@ def main():
 
     vids = [data['id'] for data in test]
     data_processor.write_predict(vids, test_y_, args.predict)
-    pdb.set_trace()
 
 
 if __name__ == '__main__':
