@@ -26,12 +26,12 @@ def main():
         data_processor = pickle.load(f)
 
     # get dataset
-    test = data_processor.get_test_dataset(args.data_path,
-                                           vids=['klteYv1Uv9A_27_33.avi',
-                                                 '5YJaS2Eswg0_22_26.avi',
-                                                 'UbmZAe5u5FI_132_141.avi',
-                                                 'JntMAcTlOF0_50_70.avi',
-                                                 'tJHUH9tpqPg_113_118.avi'])
+    test = data_processor.get_test_dataset(args.data_path)
+                                           # vids=['klteYv1Uv9A_27_33.avi',
+                                           #       '5YJaS2Eswg0_22_26.avi',
+                                           #       'UbmZAe5u5FI_132_141.avi',
+                                           #       'JntMAcTlOF0_50_70.avi',
+                                           #       'tJHUH9tpqPg_113_118.avi'])
 
     frame_dim = data_processor.get_frame_dim()
     word_dim = data_processor.get_word_dim()
@@ -46,7 +46,8 @@ def main():
                            batch_size=args.batch_size)
 
     clf.load(args.model_path)
-    test_y_ = clf.predict_dataset(test)
+    test_y_ = clf.predict_dataset(test,
+                                  predict_fn=clf._beam_search_batch)
 
     vids = [data['id'] for data in test]
     data_processor.write_predict(vids, test_y_, args.predict)

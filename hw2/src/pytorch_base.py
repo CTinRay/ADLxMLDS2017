@@ -93,9 +93,13 @@ class TorchBase():
 
             self._epoch += 1
 
-    def predict_dataset(self, data, batch_size=None):
+    def predict_dataset(self, data,
+                        batch_size=None,
+                        predict_fn=None):
         if batch_size is None:
             batch_size = self._batch_size
+        if predict_fn is None:
+            predict_fn = self._predict_batch
 
         dataloader = torch.utils.data.DataLoader(
             data,
@@ -107,7 +111,7 @@ class TorchBase():
         ys_ = []
         max_len = 0
         for batch in dataloader:
-            batch_y_ = self._predict_batch(batch)
+            batch_y_ = predict_fn(batch)
             ys_.append(batch_y_)
             max_len = max(batch_y_.shape[1], max_len)
 
