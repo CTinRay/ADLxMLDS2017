@@ -124,9 +124,9 @@ class DataProcessor:
 
     def postprocess_sentence(self, sentence):
         sentence = sentence.replace('<sos> ', '') \
-          .replace(' <eos>', '') \
           .replace(' <pad>', '') \
           .replace(' .', '.')
+        sentence = sentence[:sentence.find('<eos>')]
         return sentence
 
     def write_predict(self, vids, predicts, filename):
