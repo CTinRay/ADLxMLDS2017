@@ -72,7 +72,8 @@ class CalcBleu(Callback):
             self._captions.append(captions)
 
     def on_epoch_end(self, log_train, log_valid, model):
-        ys_ = model.predict_dataset(self._dataset)
+        ys_ = model.predict_dataset(self._dataset,
+                                    predict_fn=model._beam_search_batch)
         sentences = [self._data_processor.indices_to_sentence(y)
                      for y in ys_]
         sentences = [self._data_processor.postprocess_sentence(sentence)
