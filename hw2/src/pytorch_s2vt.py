@@ -67,19 +67,20 @@ class TorchS2VT(TorchBase):
 
             prev_word = prev_word.detach()
             # decode
-            probs, hidden_video, hidden_caption = \
+            logits, hidden_video, hidden_caption = \
                 self._model.decoder.forward(prev_word,
                                             hidden_video, hidden_caption,
                                             training)
 
+            probs = torch.nn.functional.softmax(logits)
             # store prediction
             var_predicts = \
                 torch.cat([var_predicts,
-                           torch.max(probs, -1)[1].unsqueeze(0)],
+                           torch.multinomial(probs, 1).view(1, -1)],
                           0)
 
             # accumulate loss
-            var_loss += self._loss(probs, var_y[i])
+            var_loss += self._loss(logits, var_y[i])
 
         var_loss = var_loss / sum(batch['caption_len'])
         return var_predicts, var_loss
@@ -126,7 +127,7 @@ class TorchS2VT(TorchBase):
 
         return var_predicts.data.cpu().numpy().T
 
-    def _beam_search_batch(self, batch, beam_size=10):
+    def _beam_search_batch(self, batch, beam_size=5):
         var_x = Variable(batch['x'].transpose(0, 1), volatile=True)
         batch['video_len'] = batch['video_len'].tolist()
 
@@ -155,7 +156,8 @@ class TorchS2VT(TorchBase):
             var_predicts = var_predicts.cuda()
             if_end = if_end.cuda()
 
-        while not if_end.all():
+        depth = 0
+        while not if_end.all() and depth < 30:
             beam_scores, beam_hidden_video, beam_hidden_caption = [], [], []
             for i in range(var_predicts.data.shape[-1]):
                 # take previous label according to if_teach
@@ -241,6 +243,7 @@ class TorchS2VT(TorchBase):
                           0)
 
             if_end = if_end | (var_predicts[-1] == 1).data
+            depth += 1
 
         _, best_score_indices = torch.max(var_scores, -1)
         var_predicts = var_predicts[:,
