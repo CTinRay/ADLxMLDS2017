@@ -160,15 +160,15 @@ class TorchHLSTMat(TorchBase):
 
         batch_size = batch['x'].shape[0]
 
-        # beam_size x batch_size
-        var_scores = Variable(torch.zeros(1, batch_size))
+        # batch_size x beam_size
+        scores = torch.zeros(batch_size, 1)
         # seq_length x batch_size x beam_size
         var_predicts = Variable(torch.ones(1, batch_size, 1).long() * 2)
         # batch_size x beam_size
         if_end = torch.zeros(batch_size, beam_size).byte()
 
         if self._use_cuda:
-            var_scores = var_scores.cuda()
+            scores = scores.cuda()
             var_predicts = var_predicts.cuda()
             if_end = if_end.cuda()
 
@@ -191,8 +191,10 @@ class TorchHLSTMat(TorchBase):
                         False)
 
                 # beam_size x [batch_size x word_dim]
-                beam_scores.append(torch.nn.functional.log_softmax(step_logits)
-                                   + var_scores[:, i].unsqueeze(-1))
+                beam_scores.append(
+                    torch.nn.functional.log_softmax(step_logits).data
+                    + (scores[:, i] * (~if_end[:, i]).float())
+                    .unsqueeze(-1))
                 # beam_size x [batch_size x hidden]
                 beam_hidden1.append(step_hidden1)
                 # beam_size x [batch_size x hidden]
@@ -202,9 +204,9 @@ class TorchHLSTMat(TorchBase):
             beam_scores = torch.cat(beam_scores, -1)
 
             # get top k
-            var_scores, best_indices = torch.topk(beam_scores,
-                                                  beam_size,
-                                                  -1, sorted=False)
+            scores, best_indices = torch.topk(beam_scores,
+                                              beam_size,
+                                              -1, sorted=False)
 
             # batch_size x beam_size
             best_beam_indices = best_indices / self._word_dim
@@ -221,28 +223,28 @@ class TorchHLSTMat(TorchBase):
             # beam_size x batch_size x hidden
             hidden1 = \
                 [(beam_hidden1[0][
-                    best_beam_indices[:, beam].data,
+                    best_beam_indices[:, beam],
                     list(range(batch_size))
                 ].unsqueeze(0),
                   beam_hidden1[1][
-                    best_beam_indices[:, beam].data,
+                    best_beam_indices[:, beam],
                     list(range(batch_size))
                   ].unsqueeze(0))
                  for beam in range(beam_size)]
             hidden2 = \
                 [(beam_hidden2[0][
-                    best_beam_indices[:, beam].data,
+                    best_beam_indices[:, beam],
                     list(range(batch_size))
                 ].unsqueeze(0),
                   beam_hidden2[1][
-                    best_beam_indices[:, beam].data,
+                    best_beam_indices[:, beam],
                     list(range(batch_size))
                   ].unsqueeze(0))
                  for beam in range(beam_size)]
 
             var_predicts = [var_predicts[:,
                                          list(range(batch_size)),
-                                         best_beam_indices[:, beam].data]
+                                         best_beam_indices[:, beam]]
                             .unsqueeze(-1)
                             for beam in range(beam_size)]
             # seq_length x batch_size x beam_size
@@ -262,9 +264,9 @@ class TorchHLSTMat(TorchBase):
             if_end = if_end | (var_predicts[-1] == 1).data
             predict_len += 1
 
-        _, best_score_indices = torch.max(var_scores, -1)
+        _, best_score_indices = torch.max(scores, -1)
         var_predicts = var_predicts[:,
                                     list(range(batch_size)),
-                                    best_score_indices.data]
+                                    best_score_indices]
 
         return var_predicts.data.cpu().numpy().T
