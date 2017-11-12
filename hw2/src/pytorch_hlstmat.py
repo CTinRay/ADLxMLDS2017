@@ -173,7 +173,7 @@ class TorchHLSTMat(TorchBase):
             if_end = if_end.cuda()
 
         predict_len = 0
-        while not if_end.all() and predict_len < 30:
+        while not torch.sum(var_predicts == 1, 0).data.all() and predict_len < 30:
             beam_scores, beam_hidden1, beam_hidden2 = [], [], []
             for i in range(var_predicts.data.shape[-1]):
                 # take previous label according to if_teach
@@ -261,7 +261,6 @@ class TorchHLSTMat(TorchBase):
                            chosen_words.unsqueeze(0)],
                           0)
 
-            if_end = if_end | (var_predicts[-1] == 1).data
             predict_len += 1
 
         _, best_score_indices = torch.max(scores, -1)
