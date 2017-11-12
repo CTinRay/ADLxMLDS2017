@@ -59,7 +59,7 @@ class TorchHLSTMat(TorchBase):
 
         for i in range(1, max(batch['caption_len'])):
             # flip coins with teach_prob
-            teach_prob = 1 - (3 * self._epoch / (150 + 3 * self._epoch)) \
+            teach_prob = 1 - (1 * self._epoch / (25 + 2 * self._epoch)) \
                 if training else 1
             # teach_prob = 1
             if_teach = torch.bernoulli(teach_prob * var_ones)
@@ -173,7 +173,8 @@ class TorchHLSTMat(TorchBase):
             if_end = if_end.cuda()
 
         predict_len = 0
-        while not torch.sum(var_predicts == 1, 0).data.all() and predict_len < 30:
+        while not torch.sum(var_predicts == 1, 0).data.all() \
+                and predict_len < 30:
             beam_scores, beam_hidden1, beam_hidden2 = [], [], []
             for i in range(var_predicts.data.shape[-1]):
                 # take previous label according to if_teach
@@ -226,21 +227,21 @@ class TorchHLSTMat(TorchBase):
                     best_beam_indices[:, beam],
                     list(range(batch_size))
                 ].unsqueeze(0),
-                  beam_hidden1[1][
+                    beam_hidden1[1][
                     best_beam_indices[:, beam],
                     list(range(batch_size))
-                  ].unsqueeze(0))
-                 for beam in range(beam_size)]
+                ].unsqueeze(0))
+                    for beam in range(beam_size)]
             hidden2 = \
                 [(beam_hidden2[0][
                     best_beam_indices[:, beam],
                     list(range(batch_size))
                 ].unsqueeze(0),
-                  beam_hidden2[1][
+                    beam_hidden2[1][
                     best_beam_indices[:, beam],
                     list(range(batch_size))
-                  ].unsqueeze(0))
-                 for beam in range(beam_size)]
+                ].unsqueeze(0))
+                    for beam in range(beam_size)]
 
             var_predicts = [var_predicts[:,
                                          list(range(batch_size)),
