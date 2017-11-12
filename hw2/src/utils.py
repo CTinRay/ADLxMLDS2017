@@ -25,6 +25,8 @@ class MSVDDataset(Dataset):
         item['x'] = np.load(os.path.join(self._base, self._files[idx]))
         item['x'] = item['x'].astype(np.float32)
         item['video_len'] = np.sum(np.sum(item['x'], axis=-1) > 0)
+        item['video_mask'] = torch.arange(0, item['x'].shape[0]) < float(item['video_len'])
+        item['video_mask'] = item['video_mask'].float()
 
         vid = self._files[idx].replace('.npy', '')
         item['id'] = vid
