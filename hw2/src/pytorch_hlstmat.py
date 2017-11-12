@@ -71,7 +71,7 @@ class TorchHLSTMat(TorchBase):
 
             prev_word = prev_word.detach()
             # decode
-            logits, hidden_video, hidden_caption = \
+            logits, hidden1, hidden2 = \
                 self._model.decoder.forward(var_x, batch['video_mask'],
                                             prev_word,
                                             hidden1, hidden2,
@@ -81,7 +81,7 @@ class TorchHLSTMat(TorchBase):
             # store prediction
             var_predicts = \
                 torch.cat([var_predicts,
-                           torch.multinomial(probs, 1).view(1, -1)],
+                           torch.max(probs, 1)[1].view(1, -1)],
                           0)
 
             # accumulate loss
@@ -122,7 +122,7 @@ class TorchHLSTMat(TorchBase):
 
             prev_word = prev_word.detach()
             # decode
-            probs, hidden_video, hidden_caption = \
+            probs, hidden1, hidden2 = \
                 self._model.decoder.forward(var_x, batch['video_mask'],
                                             prev_word,
                                             hidden1, hidden2,
@@ -139,21 +139,24 @@ class TorchHLSTMat(TorchBase):
 
         return var_predicts.data.cpu().numpy().T
 
-    def _beam_search_batch(self, batch, beam_size=5):
-        return self._predict_batch(batch)
+    def _beam_search_batch(self, batch, beam_size=5, max_len=40):
         var_x = Variable(batch['x'].transpose(0, 1), volatile=True)
         batch['video_len'] = batch['video_len'].tolist()
+        batch['video_mask'] = Variable(batch['video_mask']
+                                       .transpose(0, 1)
+                                       .unsqueeze(-1))
 
         if self._use_cuda:
             var_x = var_x.cuda()
+            batch['video_mask'] = batch['video_mask'].cuda()
 
         # encode
-        hidden_video, hidden_caption = \
+        hidden1, hidden2 = \
             self._model.encoder.forward(var_x,
                                         batch['video_mask'],
                                         False)
-        hidden_video = [hidden_video]
-        hidden_caption = [hidden_caption]
+        hidden1 = [hidden1]
+        hidden2 = [hidden2]
 
         batch_size = batch['x'].shape[0]
 
@@ -169,9 +172,9 @@ class TorchHLSTMat(TorchBase):
             var_predicts = var_predicts.cuda()
             if_end = if_end.cuda()
 
-        depth = 0
-        while not if_end.all() and depth < 30:
-            beam_scores, beam_hidden_video, beam_hidden_caption = [], [], []
+        predict_len = 0
+        while not if_end.all() and predict_len < 30:
+            beam_scores, beam_hidden1, beam_hidden2 = [], [], []
             for i in range(var_predicts.data.shape[-1]):
                 # take previous label according to if_teach
                 prev_word = var_predicts[-1, :, i]
@@ -180,19 +183,20 @@ class TorchHLSTMat(TorchBase):
                 prev_word = prev_word.detach()
 
                 # decode
-                step_logits, step_hidden_video, step_hidden_caption = \
+                step_logits, step_hidden1, step_hidden2 = \
                     self._model.decoder.forward(
+                        var_x, batch['video_mask'],
                         prev_word,
-                        hidden_video[i], hidden_caption[i],
+                        hidden1[i], hidden2[i],
                         False)
 
                 # beam_size x [batch_size x word_dim]
                 beam_scores.append(torch.nn.functional.log_softmax(step_logits)
                                    + var_scores[:, i].unsqueeze(-1))
                 # beam_size x [batch_size x hidden]
-                beam_hidden_video.append(step_hidden_video)
+                beam_hidden1.append(step_hidden1)
                 # beam_size x [batch_size x hidden]
-                beam_hidden_caption.append(step_hidden_caption)
+                beam_hidden2.append(step_hidden2)
 
             # batch_size x (beam_size x word_dim)
             beam_scores = torch.cat(beam_scores, -1)
@@ -206,31 +210,31 @@ class TorchHLSTMat(TorchBase):
             best_beam_indices = best_indices / self._word_dim
 
             # beam_size x batch_size x hidden
-            beam_hidden_video = \
-                (torch.cat([hidden[0] for hidden in beam_hidden_video], 0),
-                 torch.cat([hidden[1] for hidden in beam_hidden_video], 0))
-            beam_hidden_caption = \
-                (torch.cat([hidden[0] for hidden in beam_hidden_caption], 0),
-                 torch.cat([hidden[1] for hidden in beam_hidden_caption], 0))
+            beam_hidden1 = \
+                (torch.cat([hidden[0] for hidden in beam_hidden1], 0),
+                 torch.cat([hidden[1] for hidden in beam_hidden1], 0))
+            beam_hidden2 = \
+                (torch.cat([hidden[0] for hidden in beam_hidden2], 0),
+                 torch.cat([hidden[1] for hidden in beam_hidden2], 0))
 
             # Update states with topk beams
             # beam_size x batch_size x hidden
-            hidden_video = \
-                [(beam_hidden_video[0][
+            hidden1 = \
+                [(beam_hidden1[0][
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
                 ].unsqueeze(0),
-                  beam_hidden_video[1][
+                  beam_hidden1[1][
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
                   ].unsqueeze(0))
                  for beam in range(beam_size)]
-            hidden_caption = \
-                [(beam_hidden_caption[0][
+            hidden2 = \
+                [(beam_hidden2[0][
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
                 ].unsqueeze(0),
-                  beam_hidden_caption[1][
+                  beam_hidden2[1][
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
                   ].unsqueeze(0))
@@ -256,7 +260,7 @@ class TorchHLSTMat(TorchBase):
                           0)
 
             if_end = if_end | (var_predicts[-1] == 1).data
-            depth += 1
+            predict_len += 1
 
         _, best_score_indices = torch.max(var_scores, -1)
         var_predicts = var_predicts[:,

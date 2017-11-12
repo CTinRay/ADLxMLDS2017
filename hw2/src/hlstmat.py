@@ -32,7 +32,7 @@ class RelevantScore(torch.nn.Module):
         self.lW2 = torch.nn.Linear(dim2, hidden1, bias=False)
         self.b = torch.nn.Parameter(torch.Tensor(hidden1))
         self.tanh = torch.nn.Tanh()
-        self.lw = torch.nn.Linear(hidden1, 1)
+        self.lw = torch.nn.Linear(hidden1, 1, bias=False)
 
     def forward(self, input1, input2):
         return self.lw(self.tanh(self.lW1(input1) + self.lW2(input2) + self.b))
@@ -53,8 +53,7 @@ class HLSTMatDecoder(torch.nn.Module):
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(hidden_dim + frame_dim, embed_dim),
             torch.nn.ReLU(),
-            torch.nn.Linear(embed_dim, word_dim),
-            torch.nn.ReLU())
+            torch.nn.Linear(embed_dim, word_dim))
         self.relevant_score = RelevantScore(frame_dim, hidden_dim, 256)
 
     def forward(self, var_x, video_mask,
