@@ -15,6 +15,8 @@ class TorchBase():
         pass
 
     def _run_epoch(self, dataloader, training):
+        # set model training/evaluation mode
+        self._model.train(training)
 
         # run batches for train
         loss = 0
@@ -73,6 +75,7 @@ class TorchBase():
                 shuffle=True,
                 collate_fn=padding_collate,
                 num_workers=1)
+            # train epoch
             log_train = self._run_epoch(dataloader, True)
 
             # evaluate valid score
@@ -84,6 +87,7 @@ class TorchBase():
                     shuffle=True,
                     collate_fn=padding_collate,
                     num_workers=1)
+                # evaluate model
                 log_valid = self._run_epoch(dataloader, False)
             else:
                 log_valid = None
@@ -101,6 +105,10 @@ class TorchBase():
         if predict_fn is None:
             predict_fn = self._predict_batch
 
+        # set model to eval mode
+        self._model.eval()
+
+        # make dataloader
         dataloader = torch.utils.data.DataLoader(
             data,
             batch_size=batch_size,
