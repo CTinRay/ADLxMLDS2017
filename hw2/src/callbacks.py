@@ -82,10 +82,10 @@ class CalcBleu(Callback):
         bleu = 0
         for sentence, captions in zip(sentences, self._captions):
             sentence_bleu = 0
-            for y in captions:
-                sentence_bleu += BLEU(sentence, y)
-
-            sentence_bleu /= len(captions)
+            # for y in captions:
+            #     sentence_bleu += BLEU(sentence, y)
+            sentence_bleu = BLEU(sentence, captions, True)
+            # sentence_bleu /= len(captions)
             bleu += sentence_bleu
 
         bleu /= len(self._dataset)

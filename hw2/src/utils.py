@@ -127,7 +127,7 @@ class DataProcessor:
     def postprocess_sentence(self, sentence):
         sentence = sentence.replace('<sos> ', '') \
           .replace(' <pad>', '') \
-          .replace(' .', '.')
+          .replace('.', '')
         sentence = sentence[:sentence.find('<eos>')]
         return sentence
 
