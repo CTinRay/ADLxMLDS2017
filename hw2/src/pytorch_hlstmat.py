@@ -45,8 +45,7 @@ class TorchHLSTMat(TorchBase):
         # encode
         hidden1, hidden2 = \
             self._model.encoder.forward(var_x,
-                                        batch['video_mask'],
-                                        training)
+                                        batch['video_mask'])
 
         var_loss = 0
         batch_size = batch['x'].shape[0]
@@ -59,9 +58,9 @@ class TorchHLSTMat(TorchBase):
 
         for i in range(1, max(batch['caption_len'])):
             # flip coins with teach_prob
-            teach_prob = 1 - (1 * self._epoch / (25 + 2 * self._epoch)) \
-                if training else 1
-            # teach_prob = 1
+            # teach_prob = 1 - (1 * self._epoch / (30 + 2 * self._epoch)) \
+            #     if training else 1
+            teach_prob = 1
             if_teach = torch.bernoulli(teach_prob * var_ones)
             if_teach = if_teach.long()
 
@@ -74,8 +73,7 @@ class TorchHLSTMat(TorchBase):
             logits, hidden1, hidden2 = \
                 self._model.decoder.forward(var_x, batch['video_mask'],
                                             prev_word,
-                                            hidden1, hidden2,
-                                            training)
+                                            hidden1, hidden2)
 
             probs = torch.nn.functional.softmax(logits)
             # store prediction
@@ -104,8 +102,7 @@ class TorchHLSTMat(TorchBase):
         # encode
         hidden1, hidden2 = \
             self._model.encoder.forward(var_x,
-                                        batch['video_mask'],
-                                        False)
+                                        batch['video_mask'])
 
         batch_size = batch['x'].shape[0]
 
@@ -125,8 +122,7 @@ class TorchHLSTMat(TorchBase):
             probs, hidden1, hidden2 = \
                 self._model.decoder.forward(var_x, batch['video_mask'],
                                             prev_word,
-                                            hidden1, hidden2,
-                                            False)
+                                            hidden1, hidden2)
 
             # store prediction
             var_predicts = \
@@ -153,8 +149,7 @@ class TorchHLSTMat(TorchBase):
         # encode
         hidden1, hidden2 = \
             self._model.encoder.forward(var_x,
-                                        batch['video_mask'],
-                                        False)
+                                        batch['video_mask'])
         hidden1 = [hidden1]
         hidden2 = [hidden2]
 
@@ -188,8 +183,7 @@ class TorchHLSTMat(TorchBase):
                     self._model.decoder.forward(
                         var_x, batch['video_mask'],
                         prev_word,
-                        hidden1[i], hidden2[i],
-                        False)
+                        hidden1[i], hidden2[i])
 
                 # beam_size x [batch_size x word_dim]
                 beam_scores.append(

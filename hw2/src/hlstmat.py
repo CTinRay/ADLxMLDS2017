@@ -9,8 +9,9 @@ class HLSTMatEncoder(torch.nn.Module):
         super(HLSTMatEncoder, self).__init__()
         self.lh = torch.nn.Linear(frame_dim, hidden_dim, False)
         self.lc = torch.nn.Linear(frame_dim, hidden_dim, False)
+        self.tanh = torch.nn.Tanh()
 
-    def forward(self, frames, video_mask, training):
+    def forward(self, frames, video_mask):
         """ Forward
 
         args:
@@ -20,8 +21,8 @@ class HLSTMatEncoder(torch.nn.Module):
         frame_sum = torch.sum(frames * video_mask, dim=0)
         frame_mean = frame_sum / torch.sum(video_mask, dim=0)
 
-        h0 = self.lh(frame_mean).unsqueeze(0)
-        c0 = self.lc(frame_mean).unsqueeze(0)
+        h0 = self.tanh(self.lh(frame_mean).unsqueeze(0))
+        c0 = self.tanh(self.lc(frame_mean).unsqueeze(0))
         return None, (h0, c0)
 
 
@@ -52,14 +53,15 @@ class HLSTMatDecoder(torch.nn.Module):
         self.embedding = torch.nn.Embedding(word_dim, embed_dim)
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(hidden_dim + frame_dim, embed_dim),
-            torch.nn.ReLU(),
+            torch.nn.Tanh(),
+            torch.nn.Dropout(0.5),
             torch.nn.Linear(embed_dim, word_dim))
-        self.relevant_score = RelevantScore(frame_dim, hidden_dim, 256)
+        self.relevant_score = RelevantScore(frame_dim, hidden_dim, 128)
+        self.dropout = torch.nn.Dropout(0.5)
 
     def forward(self, var_x, video_mask,
                 prev_word,
-                hidden1, hidden2,
-                training):
+                hidden1, hidden2):
         """ Forward
 
         args:
@@ -76,13 +78,16 @@ class HLSTMatDecoder(torch.nn.Module):
 
         # feed rnns
         outputs2, hidden2 = self.rnn2(prev_word.unsqueeze(0), hidden2)
+        outputs2 = self.dropout(outputs2)
         outputs1, hidden1 = self.rnn1(outputs2, hidden1)
+        outputs1 = self.dropout(outputs1)
 
         # time x batch x 1
         relevant_scores = self.relevant_score(var_x, outputs2)
         e_relevant_scores = torch.exp(relevant_scores) * video_mask
         weights = e_relevant_scores / torch.sum(e_relevant_scores, 0)
         attention = torch.sum(weights * var_x, 0)
+        attention = self.dropout(attention)
 
         logits = self.mlp(torch.cat([outputs1.squeeze(0), attention], -1))
         return logits, hidden1, hidden2
