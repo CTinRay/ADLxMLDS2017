@@ -1,0 +1,12 @@
+# Applied Deep Learning Homework 2
+
+In this homework, pytorch version models S2VT and "Hierarchical LSTM with Adjusted Temporal Attention" are implemented.
+
+## Requirements
+
+```
+numpy==1.13.3
+torch==0.2.0.post3
+tqdm==4.19.4
+```
+
