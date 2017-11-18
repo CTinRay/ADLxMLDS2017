@@ -48,7 +48,8 @@ class PrintPredict(Callback):
 
     def on_epoch_end(self, log_train, log_valid, model):
         data = [self._dataset[i] for i in range(self._n_samples)]
-        predicts = model.predict_dataset(data)
+        predicts = model.predict_dataset(data,
+                                         predict_fn=model._beam_search_batch)
 
         for i in range(predicts.shape[0]):
             print('id = {}, predict = {}, label = {}'.format(
