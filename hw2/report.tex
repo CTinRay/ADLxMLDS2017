@@ -175,6 +175,10 @@
 
 根據論文，這種架構的理念是希望上層的 LSTM 可以專住在學習語言模型，而下層的 LSTM 則是專住在處理影片的資訊。實際上而言，因為這個架構沒有使用 RNN 編碼影片，所以訓練速度會快上許多，而且 BLEU@1 分數能達到 0.70 ，因此最終決定採取這個架構。
 
+\subsection{Beam Search}
+
+Beam Search 是一種廣度優先搜尋演算法的變形，與廣度優先演算法的差異是 Beam Search 在每個深度只會保留分數前幾高的結果，保留的數量稱為 beam size。假如 beam size 等於 1，結果則跟貪婪演算法一樣，很有可能部會得到全域最佳解；假如 beam size 設為無限，則跟暴力搜尋一樣，最後的最佳解一定是全域最佳解，但時間雜度也是指數型的。使用一個大於 1 而小於無限大的 beam size 可以在兩者之中達到平衡，有機會可以在有限的時間內獲得較好的結果。
+
 \section{Experimental results and settings}
 
 \subsection{Schedule Sampling}
