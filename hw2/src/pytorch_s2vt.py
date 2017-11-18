@@ -156,7 +156,7 @@ class TorchS2VT(TorchBase):
             var_predicts = var_predicts.cuda()
 
         depth = 0
-        while not if_end.data.all() \
+        while not if_end.all() \
                 and depth < max_len:
             beam_scores, beam_hidden_video, beam_hidden_caption = [], [], []
             for i in range(var_predicts.data.shape[-1]):
@@ -242,7 +242,7 @@ class TorchS2VT(TorchBase):
                            chosen_words.unsqueeze(0)],
                           0)
 
-            if_end = torch.sum(var_predicts == 1, 0)
+            if_end = torch.sum(var_predicts == 1, 0).data
             depth += 1
 
         _, best_score_indices = torch.max(var_scores, -1)
