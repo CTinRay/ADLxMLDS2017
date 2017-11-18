@@ -32,8 +32,8 @@ class MSVDDataset(Dataset):
         item['video_len'] = np.sum(np.sum(item['x'], axis=-1) > 0)
         item['video_mask'] = torch.arange(0, item['x'].shape[0]) < float(item['video_len'])
         item['video_mask'] = item['video_mask'].float()
-        item['x'] = (item['x'] - self._mean) \
-            / (self._std + sys.float_info.epsilon)
+        # item['x'] = (item['x'] - self._mean) \
+        #     / (self._std + sys.float_info.epsilon)
 
         vid = self._files[idx].replace('.npy', '')
         item['id'] = vid
@@ -133,6 +133,11 @@ class DataProcessor:
         return MSVDDataset(os.path.join(path, 'testing_data'),
                            self._mean, self._std,
                            self.test_labels, vids)
+
+    def get_dataset(self, path, vids=None):
+        return MSVDDataset(path,
+                           self._mean, self._std,
+                           None, vids)
 
     def get_word_dim(self):
         return len(self._word_list)

@@ -79,7 +79,7 @@ def brevity_penalty(c, r):
     if c > r:
         bp = 1
     else:
-        bp = math.exp(1-(float(r)/c))
+        bp = math.exp(1-(float(r)/(c + 0.0000001)))
     return bp
 
 
