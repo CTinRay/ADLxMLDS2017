@@ -6,6 +6,7 @@ import traceback
 from callbacks import ModelCheckpoint, PrintPredict, CalcBleu
 from pytorch_s2vt import TorchS2VT
 from pytorch_hlstmat import TorchHLSTMat
+from pytorch_dvwrnn import TorchDVWRNN
 
 
 def parse_args():
@@ -43,7 +44,8 @@ def main(args):
     # select model arch
     archs = {
         's2vt': TorchS2VT,
-        'hLSTMat': TorchHLSTMat}
+        'hLSTMat': TorchHLSTMat,
+        'DVWRNN': TorchDVWRNN}
 
     # init classifier
     clf = archs[args.arch](frame_dim=frame_dim,
