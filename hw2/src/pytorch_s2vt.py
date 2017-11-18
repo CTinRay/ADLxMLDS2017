@@ -55,7 +55,7 @@ class TorchS2VT(TorchBase):
 
         for i in range(1, max(batch['caption_len'])):
             # flip coins with teach_prob
-            teach_prob = 1 - (3 * self._epoch / (150 + 3 * self._epoch)) \
+            teach_prob = 1 - (1 * self._epoch / (100 + 3 * self._epoch)) \
                 if training else 1
             # teach_prob = 1
             if_teach = torch.bernoulli(teach_prob * var_ones)
@@ -127,7 +127,7 @@ class TorchS2VT(TorchBase):
 
         return var_predicts.data.cpu().numpy().T
 
-    def _beam_search_batch(self, batch, beam_size=5):
+    def _beam_search_batch(self, batch, beam_size=5, max_len=30):
         var_x = Variable(batch['x'].transpose(0, 1), volatile=True)
         batch['video_len'] = batch['video_len'].tolist()
 
@@ -145,19 +145,19 @@ class TorchS2VT(TorchBase):
         batch_size = batch['x'].shape[0]
 
         # beam_size x batch_size
-        var_scores = Variable(torch.zeros(1, batch_size))
+        var_scores = Variable(torch.zeros(batch_size, 1))
         # seq_length x batch_size x beam_size
         var_predicts = Variable(torch.ones(1, batch_size, 1).long() * 2)
         # batch_size x beam_size
-        if_end = torch.zeros(batch_size, beam_size).byte()
+        if_end = torch.zeros(batch_size, 1).byte()
 
         if self._use_cuda:
             var_scores = var_scores.cuda()
             var_predicts = var_predicts.cuda()
-            if_end = if_end.cuda()
 
         depth = 0
-        while not if_end.all() and depth < 30:
+        while not if_end.data.all() \
+                and depth < max_len:
             beam_scores, beam_hidden_video, beam_hidden_caption = [], [], []
             for i in range(var_predicts.data.shape[-1]):
                 # take previous label according to if_teach
@@ -207,21 +207,21 @@ class TorchS2VT(TorchBase):
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
                 ].unsqueeze(0),
-                  beam_hidden_video[1][
+                    beam_hidden_video[1][
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
-                  ].unsqueeze(0))
-                 for beam in range(beam_size)]
+                ].unsqueeze(0))
+                    for beam in range(beam_size)]
             hidden_caption = \
                 [(beam_hidden_caption[0][
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
                 ].unsqueeze(0),
-                  beam_hidden_caption[1][
+                    beam_hidden_caption[1][
                     best_beam_indices[:, beam].data,
                     list(range(batch_size))
-                  ].unsqueeze(0))
-                 for beam in range(beam_size)]
+                ].unsqueeze(0))
+                    for beam in range(beam_size)]
 
             var_predicts = [var_predicts[:,
                                          list(range(batch_size)),
@@ -242,7 +242,7 @@ class TorchS2VT(TorchBase):
                            chosen_words.unsqueeze(0)],
                           0)
 
-            if_end = if_end | (var_predicts[-1] == 1).data
+            if_end = torch.sum(var_predicts == 1, 0)
             depth += 1
 
         _, best_score_indices = torch.max(var_scores, -1)
