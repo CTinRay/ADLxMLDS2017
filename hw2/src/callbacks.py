@@ -48,7 +48,8 @@ class PrintPredict(Callback):
 
     def on_epoch_end(self, log_train, log_valid, model):
         data = [self._dataset[i] for i in range(self._n_samples)]
-        predicts = model.predict_dataset(data)
+        predicts = model.predict_dataset(data,
+                                         predict_fn=model._beam_search_batch)
 
         for i in range(predicts.shape[0]):
             print('id = {}, predict = {}, label = {}'.format(
@@ -72,7 +73,8 @@ class CalcBleu(Callback):
             self._captions.append(captions)
 
     def on_epoch_end(self, log_train, log_valid, model):
-        ys_ = model.predict_dataset(self._dataset)
+        ys_ = model.predict_dataset(self._dataset,
+                                    predict_fn=model._beam_search_batch)
         sentences = [self._data_processor.indices_to_sentence(y)
                      for y in ys_]
         sentences = [self._data_processor.postprocess_sentence(sentence)
@@ -81,10 +83,10 @@ class CalcBleu(Callback):
         bleu = 0
         for sentence, captions in zip(sentences, self._captions):
             sentence_bleu = 0
-            for y in captions:
-                sentence_bleu += BLEU(sentence, y)
-
-            sentence_bleu /= len(captions)
+            # for y in captions:
+            #     sentence_bleu += BLEU(sentence, y)
+            sentence_bleu = BLEU(sentence, captions, True)
+            # sentence_bleu /= len(captions)
             bleu += sentence_bleu
 
         bleu /= len(self._dataset)

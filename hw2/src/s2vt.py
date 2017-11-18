@@ -19,7 +19,7 @@ class S2VTEncoder(torch.nn.Module):
         """ Forward
 
         args:
-            frame (Variable): (batch, time, feature)
+            frame (Variable): (time, batch, feature)
             frame_lens (list): (batch,)
         """
         # encode video

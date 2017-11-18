@@ -6,13 +6,17 @@ import numpy as np
 from bleu_eval import BLEU
 from torch.utils.data import Dataset
 import pdb
+import sys
 
 
 class MSVDDataset(Dataset):
-    def __init__(self, data_dir, labels=None, vids=None):
+    def __init__(self, data_dir,
+                 mean, std, labels=None, vids=None):
         self._base = os.path.join(data_dir, 'feat')
         self._files = os.listdir(self._base)
         self._labels = labels
+        self._mean = mean
+        self._std = std
 
         if vids is not None:
             self._files = [vid + '.npy' for vid in vids]
@@ -24,7 +28,12 @@ class MSVDDataset(Dataset):
         item = {}
         item['x'] = np.load(os.path.join(self._base, self._files[idx]))
         item['x'] = item['x'].astype(np.float32)
+        # item['x'] = item['x'][::-1]
         item['video_len'] = np.sum(np.sum(item['x'], axis=-1) > 0)
+        item['video_mask'] = torch.arange(0, item['x'].shape[0]) < float(item['video_len'])
+        item['video_mask'] = item['video_mask'].float()
+        # item['x'] = (item['x'] - self._mean) \
+        #     / (self._std + sys.float_info.epsilon)
 
         vid = self._files[idx].replace('.npy', '')
         item['id'] = vid
@@ -91,6 +100,12 @@ class DataProcessor:
 
         return dictionary
 
+    def _calculate_mean_std(self, dataset):
+        xs = [data['x'] for data in dataset]
+        xs = np.concatenate(xs, axis=0)
+        self._mean = np.mean(xs, 0)
+        self._std = np.std(xs, 0)
+
     def __init__(self, path):
         # load training labels and make word dict/list
         train_label_filename = os.path.join(path, 'training_label.json')
@@ -105,13 +120,24 @@ class DataProcessor:
             test_labels = json.load(f)
         self.test_labels = self._json_obj_to_dict(test_labels)
 
+        self._calculate_mean_std(
+            MSVDDataset(os.path.join(path, 'training_data'), 0, 1,
+                        self.train_labels))
+
     def get_train_dataset(self, path):
         return MSVDDataset(os.path.join(path, 'training_data'),
+                           self._mean, self._std,
                            self.train_labels)
 
     def get_test_dataset(self, path, vids=None):
         return MSVDDataset(os.path.join(path, 'testing_data'),
+                           self._mean, self._std,
                            self.test_labels, vids)
+
+    def get_dataset(self, path, vids=None):
+        return MSVDDataset(path,
+                           self._mean, self._std,
+                           None, vids)
 
     def get_word_dim(self):
         return len(self._word_list)
@@ -124,9 +150,9 @@ class DataProcessor:
 
     def postprocess_sentence(self, sentence):
         sentence = sentence.replace('<sos> ', '') \
-          .replace(' <eos>', '') \
           .replace(' <pad>', '') \
-          .replace(' .', '.')
+          .replace('.', '')
+        sentence = sentence[:sentence.find('<eos>')]
         return sentence
 
     def write_predict(self, vids, predicts, filename):

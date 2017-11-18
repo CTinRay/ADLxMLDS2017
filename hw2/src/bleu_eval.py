@@ -79,7 +79,7 @@ def brevity_penalty(c, r):
     if c > r:
         bp = 1
     else:
-        bp = math.exp(1-(float(r)/c))
+        bp = math.exp(1-(float(r)/(c + 0.0000001)))
     return bp
 
 
@@ -87,12 +87,15 @@ def geometric_mean(precisions):
     return (reduce(operator.mul, precisions)) ** (1.0 / len(precisions))
 
 
-def BLEU(s,t):
+def BLEU(s,t,flag = False):
 
     score = 0.  
     count = 0
     candidate = [s.strip()]
-    references = [[t.strip()]] 
+    if flag:
+        references = [[t[i].strip()] for i in range(len(t))]
+    else:
+        references = [[t.strip()]] 
     precisions = []
     pr, bp = count_ngram(candidate, references, 1)
     precisions.append(pr)
@@ -111,13 +114,24 @@ if __name__ == "__main__" :
             test_id = line[:comma]
             caption = line[comma+1:]
             result[test_id] = caption
+    #count by average
     bleu=[]
     for item in test:
         score_per_video = []
         for caption in item['caption']:
+            caption = caption.rstrip('.')
             score_per_video.append(BLEU(result[item['id']],caption))
         bleu.append(sum(score_per_video)/len(score_per_video))
     average = sum(bleu) / len(bleu)
-    print("Average bleu score is " + str(average))
+    print("Originally, average bleu score is " + str(average))
+    #count by the method described in the paper https://aclanthology.info/pdf/P/P02/P02-1040.pdf
+    bleu=[]
+    for item in test:
+        score_per_video = []
+        captions = [x.rstrip('.') for x in item['caption']]
+        score_per_video.append(BLEU(result[item['id']],captions,True))
+        bleu.append(score_per_video[0])
+    average = sum(bleu) / len(bleu)
+    print("By another method, average bleu score is " + str(average))
 
 

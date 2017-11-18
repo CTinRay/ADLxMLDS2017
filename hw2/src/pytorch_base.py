@@ -15,6 +15,8 @@ class TorchBase():
         pass
 
     def _run_epoch(self, dataloader, training):
+        # set model training/evaluation mode
+        self._model.train(training)
 
         # run batches for train
         loss = 0
@@ -73,6 +75,7 @@ class TorchBase():
                 shuffle=True,
                 collate_fn=padding_collate,
                 num_workers=1)
+            # train epoch
             log_train = self._run_epoch(dataloader, True)
 
             # evaluate valid score
@@ -84,6 +87,7 @@ class TorchBase():
                     shuffle=True,
                     collate_fn=padding_collate,
                     num_workers=1)
+                # evaluate model
                 log_valid = self._run_epoch(dataloader, False)
             else:
                 log_valid = None
@@ -93,10 +97,18 @@ class TorchBase():
 
             self._epoch += 1
 
-    def predict_dataset(self, data, batch_size=None):
+    def predict_dataset(self, data,
+                        batch_size=None,
+                        predict_fn=None):
         if batch_size is None:
             batch_size = self._batch_size
+        if predict_fn is None:
+            predict_fn = self._predict_batch
 
+        # set model to eval mode
+        self._model.eval()
+
+        # make dataloader
         dataloader = torch.utils.data.DataLoader(
             data,
             batch_size=batch_size,
@@ -107,7 +119,7 @@ class TorchBase():
         ys_ = []
         max_len = 0
         for batch in dataloader:
-            batch_y_ = self._predict_batch(batch)
+            batch_y_ = predict_fn(batch)
             ys_.append(batch_y_)
             max_len = max(batch_y_.shape[1], max_len)
 
@@ -124,14 +136,14 @@ class TorchBase():
         torch.save({
             'epoch': self._epoch + 1,
             'model': self._model.state_dict(),
-            'optimizer': self._optimizer.state_dict()
+            # 'optimizer': self._optimizer.state_dict()
         }, path)
 
     def load(self, path):
         checkpoint = torch.load(path)
         self._epoch = checkpoint['epoch']
         self._model.load_state_dict(checkpoint['model'])
-        self._optimizer.load_state_dict(checkpoint['optimizer'])
+        # self._optimizer.load_state_dict(checkpoint['optimizer'])
 
 
 numpy_type_map = {

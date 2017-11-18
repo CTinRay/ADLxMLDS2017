@@ -4,6 +4,8 @@ import pickle
 import sys
 import traceback
 from pytorch_s2vt import TorchS2VT
+from pytorch_hlstmat import TorchHLSTMat
+from pytorch_dvwrnn import TorchDVWRNN
 
 
 def main():
@@ -12,7 +14,9 @@ def main():
                         help='Pickle made by make_pickle.py')
     parser.add_argument('model_path', type=str,
                         help='Path for model')
-    parser.add_argument('data_path', type=str,
+    parser.add_argument('ids_file', type=str,
+                        help='File that contains ids')
+    parser.add_argument('feat_path', type=str,
                         help='Path for raw data directory')
     parser.add_argument('predict', type=str,
                         help='Predict file')
@@ -25,20 +29,23 @@ def main():
     with open(args.pickle, 'rb') as f:
         data_processor = pickle.load(f)
 
+    vids = []
+    # read vids
+    with open(args.ids_file, 'r') as f:
+        for line in f:
+            vids.append(line.strip())
+
     # get dataset
-    test = data_processor.get_test_dataset(args.data_path,
-                                           vids=['klteYv1Uv9A_27_33.avi',
-                                                 '5YJaS2Eswg0_22_26.avi',
-                                                 'UbmZAe5u5FI_132_141.avi',
-                                                 'JntMAcTlOF0_50_70.avi',
-                                                 'tJHUH9tpqPg_113_118.avi'])
+    test = data_processor.get_dataset(args.feat_path, vids)
 
     frame_dim = data_processor.get_frame_dim()
     word_dim = data_processor.get_word_dim()
 
     # select model arch
     archs = {
-        's2vt': TorchS2VT}
+        's2vt': TorchS2VT,
+        'hLSTMat': TorchHLSTMat,
+        'DVWRNN': TorchDVWRNN}
 
     # init classifier
     clf = archs[args.arch](frame_dim=frame_dim,
@@ -46,7 +53,8 @@ def main():
                            batch_size=args.batch_size)
 
     clf.load(args.model_path)
-    test_y_ = clf.predict_dataset(test)
+    test_y_ = clf.predict_dataset(test,
+                                  predict_fn=clf._beam_search_batch)
 
     vids = [data['id'] for data in test]
     data_processor.write_predict(vids, test_y_, args.predict)
