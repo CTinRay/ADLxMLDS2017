@@ -9,15 +9,17 @@ from agent_dqn import AgentDQN
 
 def main(args):
     env = gym.make('Breakout-v0')
-    env = wrap_deepmind(env, frame_stack=True)
+    env = wrap_deepmind(env, clip_rewards=False, episode_life=False,
+                        frame_stack=True)
     train_args = {
         'max_timesteps': 1000000,
-        'gamma': 0.9,
-        'buffer_size': 10000,
+        'gamma': 0.99999,
+        'buffer_size': 100000,
         'exploration_final_eps': 0.05,
         'batch_size': 16,
         'prioritized_replay_eps': 1e-4,
-        'target_network_update_freq': 100
+        'target_network_update_freq': 100,
+        'learning_rate': 1e-3
     }
     agent_dqn = AgentDQN(env, train_args)
     agent_dqn.train()

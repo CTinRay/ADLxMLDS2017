@@ -18,6 +18,7 @@ class Q(torch.nn.Module):
             torch.nn.Linear(256, n_actions))
 
     def forward(self, frames):
+        frames = frames.transpose(-3, -1)
         x = self.cnn(frames)
         x = x.view(x.size(0), -1)
         return self.mlp(x)

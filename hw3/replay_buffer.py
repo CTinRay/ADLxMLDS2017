@@ -6,9 +6,9 @@ class ReplayBuffer:
     def __init__(self, size, alpha=1):
         self.states0 = np.array([None] * size)
         self.states1 = np.array([None] * size)
-        self.rewards = np.zeros(size, dtype=float)
+        self.rewards = np.zeros(size, dtype=np.float32)
         self.actions = np.zeros(size, dtype=int)
-        self.dones = np.zeros(size, dtype=bool)
+        self.dones = np.zeros(size, dtype=np.float32)
         self.priorities = np.zeros(size)
         self.max_size = size
         self.next_index = 0
@@ -59,7 +59,7 @@ class ReplayBuffer:
             states1, \
             self.dones[indices], \
             indices, \
-            weights
+            weights.astype(np.float32)
 
     def update_priorities(self, indices, priorities):
         self.priorities[indices] = priorities ** self._alpha
