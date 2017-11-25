@@ -1,3 +1,4 @@
+import pdb
 import numpy as np
 
 
@@ -43,7 +44,7 @@ class ReplayBuffer:
         weights = (sample_probs[indices] * self.size) ** (-beta)
 
         # normalize with max_weight
-        min_prob = np.min(sample_probs)
+        min_prob = np.min(sample_probs[:self.size])
         max_weight = (min_prob * self.size) ** (-beta)
         weights /= max_weight
 
