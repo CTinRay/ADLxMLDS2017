@@ -3,29 +3,29 @@ import random
 import numpy as np
 import torch
 from torch.autograd import Variable
-from replay_buffer import ReplayBuffer
+from openai_replay_buffer import PrioritizedReplayBuffer as ReplayBuffer
 from q import Q
 
 
-class AgentDQN:
+class Agent_DQN:
     def __init__(self, env, args):
         self.t = 0
         self.env = env
         self.n_actions = self.env.action_space.n
-        self.max_timesteps = args['max_timesteps']
-        self.gamma = args['gamma']
-        self.exploration_final_eps = args['exploration_final_eps']
-        self.batch_size = args['batch_size']
-        self.prioritized_replay_eps = args['prioritized_replay_eps']
-        self.target_network_update_freq = args['target_network_update_freq']
-        self.replay_buffer = ReplayBuffer(args['buffer_size'])
+        self.max_timesteps = args.max_timesteps
+        self.gamma = args.gamma
+        self.exploration_final_eps = args.exploration_final_eps
+        self.batch_size = args.batch_size
+        self.prioritized_replay_eps = args.prioritized_replay_eps
+        self.target_network_update_freq = args.target_network_update_freq
+        self.replay_buffer = ReplayBuffer(int(args.buffer_size), 1)
 
         self._model = Q(self.env.observation_space.shape,
                         self.env.action_space.n)
         self._use_cuda = torch.cuda.is_available()
         self._loss = torch.nn.SmoothL1Loss()
         self._optimizer = torch.optim.Adam(self._model.parameters(),
-                                           lr=args['learning_rate'])
+                                           lr=args.learning_rate)
         if self._use_cuda:
             self._model = self._model.cuda()
 
@@ -38,8 +38,8 @@ class AgentDQN:
         if not test:
             epsilon = 1 \
                 - (1 - self.exploration_final_eps) \
-                * self.t / 100000
-            epsilon = max(epsilon, 0)
+                * self.t / 10000
+            epsilon = max(epsilon, self.exploration_final_eps)
             explore = random.random() < epsilon
         else:
             explore = False
@@ -57,7 +57,7 @@ class AgentDQN:
 
     def update_model(self, target_q):
         # sample from replay_buffer
-        replay = self.replay_buffer.sample(self.batch_size, beta=1)
+        replay = self.replay_buffer.sample(self.batch_size, beta=0.01)
 
         # prepare tensors
         tensor_replay = [torch.from_numpy(val) for val in replay]
@@ -72,13 +72,17 @@ class AgentDQN:
             target_q.forward(var_states1).max(-1)[0]
         var_targets = Variable(rewards) \
             + self.gamma * var_target_reward * (-Variable(dones) + 1)
-        var_targets = var_targets.detach()
+        var_targets = var_targets.unsqueeze(-1).detach()
 
         # gradient descend model
         var_states0 = Variable(states0.float())
-        var_action_values = self._model.forward(var_states0)\
-            .gather(1, Variable(actions.view(-1, 1)))
-        var_loss = self._loss(var_action_values, var_targets)
+        var_action_values = self._model.forward(var_states0).gather(1, Variable(actions.view(-1, 1)))
+        # var_loss = self._loss(var_action_values, var_targets)
+        var_loss = torch.abs(var_action_values - var_targets)
+
+        if self.t % 2000 == 0:
+            print(var_targets)
+        #     pdb.set_trace()
 
         # weighted sum loss
         var_weights = Variable(weights)
@@ -107,27 +111,37 @@ class AgentDQN:
         state0 = self.env.reset()
 
         # log statics
+        loss = 0
         episode_rewards = [0]
-        for self.t in range(self.max_timesteps):
+        while self.t < self.max_timesteps:
             # play
-            action = self.make_action(np.array(state0), False)
-            state1, reward, done, _ = self.env.step(action)
-            self.replay_buffer.add(state0, action,
-                                   reward, state1, done)
-            # accumulate episode reward
-            episode_rewards[-1] += reward
+            for i in range(4):
+                action = self.make_action(np.array(state0), False)
+                state1, reward, done, _ = self.env.step(action)
+                self.replay_buffer.add(state0, action,
+                                       float(reward), state1, float(done))
+                # accumulate episode reward
+                episode_rewards[-1] += reward
 
-            # update previous state
-            if done:
-                state0 = self.env.reset()
-                print('t = %d, r = %f' % (self.t, episode_rewards[-1]))
-                episode_rewards.append(0)
-            else:
-                state0 = state1
+                # update previous state
+                if done:
+                    state0 = self.env.reset()
+                    print('t = %d, r = %f, loss = %f' % (self.t, episode_rewards[-1], loss))
+                    episode_rewards.append(0)
+                else:
+                    state0 = state1
 
-            # train on batch
-            loss = self.update_model(target_q)
+            if self.t > 1000:
+                # train on batch
+                loss = self.update_model(target_q)
 
             # update target network
             if self.t % self.target_network_update_freq == 0:
                 target_q.load_state_dict(self._model.state_dict())
+
+            if self.t % 10000 == 0:
+                torch.save({
+                    'model': self._model.state_dict()
+                }, 'model')
+
+            self.t += 1
