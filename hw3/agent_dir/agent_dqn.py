@@ -15,6 +15,7 @@ class Agent_DQN:
         self.max_timesteps = args.max_timesteps
         self.gamma = args.gamma
         self.exploration_final_eps = args.exploration_final_eps
+        self.exploration_steps = args.exploration_steps
         self.batch_size = args.batch_size
         self.prioritized_replay_eps = args.prioritized_replay_eps
         self.target_network_update_freq = args.target_network_update_freq
@@ -29,6 +30,16 @@ class Agent_DQN:
         if self._use_cuda:
             self._model = self._model.cuda()
 
+        if args.test_pg:
+            print('loading trained model')
+            if self._use_cuda:
+                ckp = torch.load(args.test_pg)
+            else:
+                ckp = torch.load(args.test_dqn,
+                                 map_location=lambda storage, loc: storage)
+
+            self._model.load_state_dict(ckp['model'])
+
     def init_game_setting(self):
         pass
 
@@ -36,13 +47,13 @@ class Agent_DQN:
 
         # decide if doing exploration
         if not test:
-            epsilon = 1 \
+            self.epsilon = 1 \
                 - (1 - self.exploration_final_eps) \
-                * self.t / 10000
-            epsilon = max(epsilon, self.exploration_final_eps)
-            explore = random.random() < epsilon
+                * self.t / self.exploration_steps
+            self.epsilon = max(self.epsilon, self.exploration_final_eps)
         else:
-            explore = False
+            self.epsilon = self.exploration_final_eps
+        explore = random.random() < self.epsilon
 
         if explore:
             return random.randint(0, self.n_actions - 1)
@@ -57,7 +68,11 @@ class Agent_DQN:
 
     def update_model(self, target_q):
         # sample from replay_buffer
-        replay = self.replay_buffer.sample(self.batch_size, beta=0.01)
+        beta = 0.1 \
+            + (1 - 0.10) \
+            * self.t / self.max_timesteps
+        beta = min(beta, 1)
+        replay = self.replay_buffer.sample(self.batch_size, beta=beta)
 
         # prepare tensors
         tensor_replay = [torch.from_numpy(val) for val in replay]
@@ -116,7 +131,7 @@ class Agent_DQN:
         while self.t < self.max_timesteps:
             # play
             for i in range(4):
-                action = self.make_action(np.array(state0), False)
+                action = self.make_action(state0, False)
                 state1, reward, done, _ = self.env.step(action)
                 self.replay_buffer.add(state0, action,
                                        float(reward), state1, float(done))
@@ -126,20 +141,21 @@ class Agent_DQN:
                 # update previous state
                 if done:
                     state0 = self.env.reset()
-                    print('t = %d, r = %f, loss = %f' % (self.t, episode_rewards[-1], loss))
+                    print('t = %d, r = %f, loss = %f, exp = %f'
+                          % (self.t, episode_rewards[-1], loss, self.epsilon))
                     episode_rewards.append(0)
                 else:
                     state0 = state1
 
-            if self.t > 1000:
-                # train on batch
-                loss = self.update_model(target_q)
+            # if self.t > 1000:
+            #     # train on batch
+            loss = self.update_model(target_q)
 
             # update target network
             if self.t % self.target_network_update_freq == 0:
                 target_q.load_state_dict(self._model.state_dict())
 
-            if self.t % 10000 == 0:
+            if self.t % 5000 == 0:
                 torch.save({
                     'model': self._model.state_dict()
                 }, 'model')
