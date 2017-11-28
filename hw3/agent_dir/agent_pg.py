@@ -12,10 +12,6 @@ class Agent_PG():
         self.batch_size = args.batch_size
         self._max_iters = args.max_timesteps
         self._iter = 0
-        if args.test_pg:
-            print('loading trained model')
-            ckp = torch.load(args.test_pg)
-            self._model.load_state_dict(ckp['model'])
 
         self._model = Policy(self.env.observation_space.shape,
                              self.env.action_space.n)
@@ -25,17 +21,33 @@ class Agent_PG():
         if self._use_cuda:
             self._model = self._model.cuda()
 
+        if args.test_pg:
+            print('loading trained model')
+            if self._use_cuda:
+                ckp = torch.load(args.test_pg)
+            else:
+                ckp = torch.load(args.test_pg,
+                                 map_location=lambda storage, loc: storage)
+
+            self._model.load_state_dict(ckp['model'])
+
+
+        self._prev_obs = None
+
     def init_game_setting(self):
         pass
 
-    def _train_iteration(self, obs):
-        done = False
+    def _train_iteration(self, mean):
         step = 0
-        total_rewards = 0
         total_log_probs = 0
-        while not done and step < 500:
+        self._prev_obs = self.env.reset()
+        obs, reward, done, _ = self.env.step(0)
+        total_rewards = reward
+        while not done:
             # calculate action probability
-            var_obs = Variable(torch.from_numpy(obs).float().unsqueeze(0))
+            var_obs = Variable(torch.from_numpy(obs - self._prev_obs)
+                               .float().unsqueeze(0))
+            var_obs = var_obs.max(-1)[0]
             if self._use_cuda:
                 var_obs = var_obs.cuda()
             action_probs = self._model.forward(var_obs)
@@ -44,6 +56,7 @@ class Agent_PG():
             action = torch.multinomial(action_probs, 1).data
 
             # get next observation
+            self._prev_obs = obs
             obs, reward, done, _ = self.env.step(action[0, 0])
 
             # accumulate reward and probability
@@ -52,20 +65,24 @@ class Agent_PG():
             step += 1
 
         self._optimizer.zero_grad()
-        (-total_rewards * total_log_probs).backward()
+        (-(total_rewards - mean) * total_log_probs).backward()
         self._optimizer.step()
 
         return obs, total_rewards
 
     def train(self):
-        rewards = []
+        rewards = [-21]
         while self._iter < self._max_iters:
-            obs = self.env.reset()
-            obs, reward = self._train_iteration(obs)
+            mean = sum(rewards[-20:]) / len(rewards[-20:])
+            obs, reward = self._train_iteration(mean)
             rewards.append(reward)
 
-            if self._iter % 2000 == 0:
-                print('%d %f' % (self._iter, sum(rewards[-100:]) / 100))
+            if self._iter % 20 == 0:
+                print('%d %f' % (self._iter, mean))
+
+            if self._iter % 100 == 0:
+                torch.save({'model': self._model.state_dict(),
+                            'iter': self._iter}, 'model-pg-pong')
 
             self._iter += 1
 
@@ -91,7 +108,7 @@ class Policy(torch.nn.Module):
     def __init__(self, input_shape, n_actions):
         super(Policy, self).__init__()
         self.cnn = torch.nn.Sequential(
-            torch.nn.Conv2d(input_shape[-1], 32, 8, stride=4),
+            torch.nn.Conv2d(1, 32, 8, stride=4),
             torch.nn.ELU(),
             # torch.nn.MaxPool2d(2),
             torch.nn.Conv2d(32, 64, 4, stride=2),
@@ -107,7 +124,7 @@ class Policy(torch.nn.Module):
         )
 
     def forward(self, frames):
-        frames = frames.transpose(-3, -1)
+        frames = frames.unsqueeze(-3)
         x = self.cnn(frames)
         x = x.view(x.size(0), -1)
         return self.mlp(x)
