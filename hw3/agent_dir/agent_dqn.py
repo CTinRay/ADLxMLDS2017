@@ -102,11 +102,11 @@ class Agent_DQN:
 
         # weighted sum loss
         var_weights = Variable(weights)
-        var_loss_sum = torch.sum(var_loss * var_weights)
+        var_loss_mean = torch.sum(var_loss * var_weights) / self.batch_size
 
         # gradient descend loss
         self._optimizer.zero_grad()
-        var_loss_sum.backward()
+        var_loss_mean.backward()
         self._optimizer.step()
 
         # update experience priorities
