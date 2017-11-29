@@ -20,6 +20,8 @@ class Agent_DQN:
         self.prioritized_replay_eps = args.prioritized_replay_eps
         self.target_network_update_freq = args.target_network_update_freq
         self.replay_buffer = ReplayBuffer(int(args.buffer_size), 1)
+        self.save_freq = args.save_freq
+        self.log_file = args.log_file
 
         self._model = Q(self.env.observation_space.shape,
                         self.env.action_space.n)
@@ -30,10 +32,10 @@ class Agent_DQN:
         if self._use_cuda:
             self._model = self._model.cuda()
 
-        if args.test_pg:
+        if args.test_dqn:
             print('loading trained model')
             if self._use_cuda:
-                ckp = torch.load(args.test_pg)
+                ckp = torch.load(args.test_dqn)
             else:
                 ckp = torch.load(args.test_dqn,
                                  map_location=lambda storage, loc: storage)
@@ -91,13 +93,12 @@ class Agent_DQN:
 
         # gradient descend model
         var_states0 = Variable(states0.float())
-        var_action_values = self._model.forward(var_states0).gather(1, Variable(actions.view(-1, 1)))
-        # var_loss = self._loss(var_action_values, var_targets)
-        var_loss = torch.abs(var_action_values - var_targets)
+        var_action_values = self._model.forward(var_states0) \
+            .gather(1, Variable(actions.view(-1, 1)))
+        var_loss = (var_action_values - var_targets) ** 2
 
-        if self.t % 2000 == 0:
+        if self.t % 5000 == 0:
             print(var_targets)
-        #     pdb.set_trace()
 
         # weighted sum loss
         var_weights = Variable(weights)
@@ -117,6 +118,7 @@ class Agent_DQN:
         return np.mean(loss)
 
     def train(self):
+        # init target network
         target_q = Q(self.env.observation_space.shape,
                      self.env.action_space.n)
         if self._use_cuda:
@@ -128,6 +130,11 @@ class Agent_DQN:
         # log statics
         loss = 0
         episode_rewards = [0]
+        best_mean_reward = 0
+
+        if self.log_file is not None:
+            fp_log = open(self.log_file, 'w', buffering=1)
+
         while self.t < self.max_timesteps:
             # play
             for i in range(4):
@@ -138,11 +145,15 @@ class Agent_DQN:
                 # accumulate episode reward
                 episode_rewards[-1] += reward
 
-                # update previous state
+                # update previous state and log
                 if done:
                     state0 = self.env.reset()
                     print('t = %d, r = %f, loss = %f, exp = %f'
                           % (self.t, episode_rewards[-1], loss, self.epsilon))
+                    if self.log_file is not None:
+                        fp_log.write('{},{},{}\n'.format(self.t,
+                                                         episode_rewards[-1],
+                                                         loss))
                     episode_rewards.append(0)
                 else:
                     state0 = state1
@@ -155,9 +166,15 @@ class Agent_DQN:
             if self.t % self.target_network_update_freq == 0:
                 target_q.load_state_dict(self._model.state_dict())
 
-            if self.t % 5000 == 0:
-                torch.save({
-                    'model': self._model.state_dict()
-                }, 'model')
+            if self.t % self.save_freq == 0:
+                mean_reward = \
+                    sum(episode_rewards[-100:]) / len(episode_rewards[-100:])
+                if best_mean_reward < mean_reward:
+                    print('save best model with mean reward = %f'
+                          % mean_reward)
+                    best_mean_reward = mean_reward
+                    torch.save({
+                        'model': self._model.state_dict()
+                    }, 'model')
 
             self.t += 1
