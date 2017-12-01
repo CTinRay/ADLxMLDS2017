@@ -111,7 +111,7 @@ class Agent_DQN:
 
         # update experience priorities
         indices = replay[5]
-        loss = var_loss.data.cpu().numpy()
+        loss = torch.abs(var_action_values - var_targets).data.cpu().numpy()
         new_priority = loss + self.prioritized_replay_eps
         self.replay_buffer.update_priorities(indices, new_priority)
 
