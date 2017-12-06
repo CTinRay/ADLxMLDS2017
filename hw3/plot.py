@@ -22,14 +22,16 @@ def main(args):
     rewards = np.array(rewards)
     rewards = np.convolve(rewards,
                           np.ones((args.window_size,)) / args.window_size,
-                          mode='same')
+                          mode='valid')
     fig = plt.figure(dpi=450)
     ax = fig.add_subplot(1, 1, 1)
     ax.set_title('Reward over time')
     ax.set_xlabel('Time Steps')
     ax.set_ylabel('Avg. Reward')
 
-    ax.plot(timesteps, rewards)
+    index_start = args.window_size // 2
+    index_end = len(timesteps) - index_start + 1
+    ax.plot(timesteps[index_start:index_end], rewards)
     fig.savefig(args.output)
 
 
