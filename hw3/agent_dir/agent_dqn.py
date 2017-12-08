@@ -92,7 +92,7 @@ class Agent_DQN:
         var_states0 = Variable(states0.float())
         var_action_value = self._model.forward(var_states0) \
             .gather(1, Variable(actions.view(-1, 1)))
-        var_loss = (var_action_value - var_target) ** 2 / self.batch_size
+        var_loss = (var_action_value - var_target) ** 2
 
         if self.t % 5000 == 0:
             print(var_target)
