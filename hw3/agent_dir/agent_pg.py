@@ -2,6 +2,8 @@ import math
 import pdb
 import torch
 from torch.autograd import Variable
+import scipy.misc
+import numpy as np
 
 
 class Agent_PG():
@@ -9,7 +11,7 @@ class Agent_PG():
         """
         Initialize every things you need here.
         For example: building your model
-        """
+        """        
         self.env = env
         self.batch_size = args.batch_size
         self.log_file = args.log_file
@@ -40,15 +42,21 @@ class Agent_PG():
         pass
 
     def _preprocess_obs(self, obs):
-        obs = obs[35:195]
-        obs = obs[::2, ::2, :1]
-        obs = obs[:, :, 0]
-        obs[obs == 144] = 0
-        obs[obs == 109] = 0
-        obs[obs != 0] = 1
+        # obs = obs[35:195]
+        # obs = obs[::2, ::2, :1]
+        # obs = obs[:, :, 0]
+        # obs[obs == 144] = 0
+        # obs[obs == 109] = 0
+        # obs[obs != 0] = 1
+        # processed = obs - self._prev_obs
+        obs = 0.2126 * obs[:, :, 0] \
+              + 0.7152 * obs[:, :, 1] \
+              + 0.0722 * obs[:, :, 2]
+        obs = obs.astype(np.uint8)
+        obs = scipy.misc.imresize(obs, (80, 80))
         processed = obs - self._prev_obs
         self._prev_obs = obs
-        return processed
+        return processed.astype(float)
 
     def _train_iteration(self, obs, mean):
         n_steps = 0
@@ -77,10 +85,12 @@ class Agent_PG():
 
             n_steps += 1
 
-        loss = -(total_rewards - mean) * total_log_probs - 1e-5 * total_entropy
+        loss = -(total_rewards - mean) * total_log_probs
 
         loss.backward()
         if self._iter % self.batch_size == 0:
+            torch.nn.utils.clip_grad_norm(self._model.parameters(),
+                                          5, 'inf')
             self._optimizer.step()
             self._optimizer.zero_grad()
 
@@ -107,7 +117,7 @@ class Agent_PG():
                 fp_log.write('{},{}\n'.format(total_steps, reward))
 
             if self._iter % 10 == 0:
-                print('%d %d %f' % (n_steps, self._iter, mean))
+                print('%d %d %d %f' % (self._iter, n_steps, self._iter, mean))
 
             if self._iter % 100 == 0:
                 torch.save({'model': self._model.state_dict(),
@@ -132,6 +142,7 @@ class Agent_PG():
         if self._use_cuda:
             var_obs = var_obs.cuda()
         action_probs = self._model.forward(var_obs)
+
         # sample action
         action = torch.multinomial(action_probs, 1).data[0, 0]
 
