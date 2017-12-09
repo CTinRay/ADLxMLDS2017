@@ -43,14 +43,16 @@ class Agent_PG():
         pass
 
     def _preprocess_obs(self, obs):
+        obs = obs[34:194]
+        obs[obs[:, :, 0] == 144] = 0
+        obs[obs[:, :, 0] == 109] = 0
         obs = 0.2126 * obs[:, :, 0] \
-              + 0.7152 * obs[:, :, 1] \
-              + 0.0722 * obs[:, :, 2]
-        obs = obs.astype(np.uint8)
-        obs = scipy.misc.imresize(obs, (80, 80))
+            + 0.7152 * obs[:, :, 1] \
+            + 0.0722 * obs[:, :, 2]
+        obs = scipy.misc.imresize(obs, (80, 80)).astype(float)
         processed = obs - self._prev_obs
         self._prev_obs = obs
-        return processed.astype(float)
+        return processed
 
     def _approx_return(self, rewards, next_state):
         """Note that it is specialized for games that has only
@@ -84,6 +86,7 @@ class Agent_PG():
         # used to update policy
         var_batch_action_probs = []
         var_batch_values = []
+        var_batch_entropy = 0
         batch_rewards = []
 
         # used to update value
@@ -99,34 +102,40 @@ class Agent_PG():
             # make action
             action_probs, value = self._model.forward(var_obs.unsqueeze(0))
             action = torch.multinomial(action_probs, 1).data[0, 0]
+            entropy = torch.sum(action_probs * torch.log(action_probs))
             obs, reward, done, _ = self.env.step(action)
             obs = self._preprocess_obs(obs)
 
             # save reward, action_probs and value
             var_batch_action_probs.append(action_probs[0, action])
-            var_batch_values.append(value)
+            var_batch_entropy += entropy
+            var_batch_values.append(value[0, 0])
             batch_rewards.append(reward)
-            var_episode_values = value
+            var_episode_values.append(value)
 
             # update policy
             if len(var_batch_values) == self.batch_size:
                 var_action_probs = torch.cat(var_batch_action_probs)
-                var_values = torch.cat(var_batch_values)
+                var_values = torch.cat(var_batch_values).detach()
                 returns = self._approx_return(batch_rewards, obs)
                 var_returns = Variable(torch.Tensor(returns))
                 if self._use_cuda:
                     var_returns = var_returns.cuda()
 
                 loss = - torch.mean(
-                    torch.log(var_action_probs) * (var_returns - var_values))
+                    torch.log(var_action_probs) * (var_returns - var_values)) \
+                    - 1e-3 * var_batch_entropy / self.batch_size
 
                 # update model
                 self._optimizer.zero_grad()
                 loss.backward(retain_graph=True)
+                torch.nn.utils.clip_grad_norm(self._model.parameters(),
+                                              5, 'inf')
                 self._optimizer.step()
 
                 var_batch_action_probs = []
                 var_batch_values = []
+                var_batch_entropy = 0
                 batch_rewards = []
 
             # update value
@@ -134,8 +143,7 @@ class Agent_PG():
                 var_values = torch.cat(var_episode_values)
 
                 # TODO: Consider gamma when calculate loss
-                loss = self._value_coef * (var_values - reward) ** 2 \
-                    / self.batch_size
+                loss = self._value_coef * torch.mean((var_values - reward)**2)
 
                 # update model
                 self._optimizer.zero_grad()
@@ -155,7 +163,8 @@ class Agent_PG():
                       .format(self._n_steps, rewards[-1]))
 
                 mean_reward = sum(rewards[-100:]) / len(rewards[-100:])
-                if mean_reward > best_mean_reward:
+                # if mean_reward > best_mean_reward:
+                if True:
                     best_mean_reward = mean_reward
                     torch.save({'model': self._model.state_dict()},
                                'model-pg-pong')
