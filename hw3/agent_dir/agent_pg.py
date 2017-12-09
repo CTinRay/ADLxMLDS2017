@@ -11,20 +11,21 @@ class Agent_PG():
         """
         Initialize every things you need here.
         For example: building your model
-        """        
+        """
         self.env = env
         self.batch_size = args.batch_size
         self.log_file = args.log_file
-        self._max_iters = args.max_timesteps
-        self._iter = 1
+        self._max_timesteps = args.max_timesteps
+        self._n_steps = 0
 
-        self._model = Policy(self.env.observation_space.shape,
-                             self.env.action_space.n)
+        self._model = PolicyValueNet(self.env.observation_space.shape,
+                                     self.env.action_space.n)
         self._use_cuda = torch.cuda.is_available()
         if self._use_cuda:
             self._model = self._model.cuda()
         self._optimizer = torch.optim.RMSprop(self._model.parameters(),
                                               lr=1e-4)
+        self._value_coef = 0.5
 
         if args.test_pg or args.model:
             print('loading trained model')
@@ -42,13 +43,6 @@ class Agent_PG():
         pass
 
     def _preprocess_obs(self, obs):
-        # obs = obs[35:195]
-        # obs = obs[::2, ::2, :1]
-        # obs = obs[:, :, 0]
-        # obs[obs == 144] = 0
-        # obs[obs == 109] = 0
-        # obs[obs != 0] = 1
-        # processed = obs - self._prev_obs
         obs = 0.2126 * obs[:, :, 0] \
               + 0.7152 * obs[:, :, 1] \
               + 0.0722 * obs[:, :, 2]
@@ -58,72 +52,117 @@ class Agent_PG():
         self._prev_obs = obs
         return processed.astype(float)
 
-    def _train_iteration(self, obs, mean):
-        n_steps = 0
-        total_log_probs = 0
-        total_rewards = 0
-        total_entropy = 0
-        done = False
-        while total_rewards == 0 and not done:
-            # calculate action probability
-            var_obs = Variable(torch.from_numpy(self._preprocess_obs(obs))
-                               .float().unsqueeze(0))
+    def _approx_return(self, rewards, next_state):
+        """Note that it is specialized for games that has only
+           one none-zero rewards for each episode.
+        """
+        returns = list(rewards)
+        if returns[-1] == 0:
+            var_next_state = \
+                Variable(torch.from_numpy(next_state).float()) \
+                .unsqueeze(0)
             if self._use_cuda:
-                var_obs = var_obs.cuda()
-            action_probs = self._model.forward(var_obs)
-            entropy = - (action_probs * action_probs.log()).sum()
-            total_entropy += entropy
+                var_next_state = var_next_state.cuda()
+            _, var_value = self._model.forward(var_next_state)
+            returns.append(var_value.data.cpu()[0, 0])
 
-            # sample action
-            action = torch.multinomial(action_probs, 1).data[0, 0]
+        # TODO: consider gamma
+        for i in range(-2, -len(returns) - 1, -1):
+            if returns[i] == 0:
+                returns[i] = returns[i + 1]
 
-            obs, reward, done, _ = self.env.step(action)
-
-            # accumulate reward and probability
-            total_rewards += reward
-            total_log_probs += action_probs[:, action].log()
-
-            n_steps += 1
-
-        loss = -(total_rewards - mean) * total_log_probs
-
-        loss.backward()
-        if self._iter % self.batch_size == 0:
-            torch.nn.utils.clip_grad_norm(self._model.parameters(),
-                                          5, 'inf')
-            self._optimizer.step()
-            self._optimizer.zero_grad()
-
-        if done:
-            obs = self.env.reset()
-
-        return obs, total_rewards, n_steps
+        return returns[:len(rewards)]
 
     def train(self):
         if self.log_file is not None:
             fp_log = open(self.log_file, 'w', buffering=1)
 
-        total_steps = 0
-        rewards = [-1.0]
-        obs = self.env.reset()
-        self._optimizer.zero_grad()
-        while self._iter < self._max_iters:
-            mean = sum(rewards[-2000:]) / len(rewards[-2000:])
-            obs, reward, n_steps = self._train_iteration(obs, mean)
-            total_steps += n_steps
-            rewards.append(reward)
+        # used to print
+        rewards = [0]
+        best_mean_reward = -21
 
-            if self.log_file is not None:
-                fp_log.write('{},{}\n'.format(total_steps, reward))
+        # used to update policy
+        var_batch_action_probs = []
+        var_batch_values = []
+        batch_rewards = []
 
-            if self._iter % 10 == 0:
-                print('%d %d %d %f' % (self._iter, n_steps, self._iter, mean))
+        # used to update value
+        var_episode_values = []
 
-            if self._iter % 100 == 0:
-                torch.save({'model': self._model.state_dict(),
-                            'iter': self._iter}, 'model-pg-pong')
+        obs = self._preprocess_obs(self.env.reset())
+        while self._n_steps < self._max_timesteps:
+            # convert observation to Variable
+            var_obs = Variable(torch.from_numpy(obs).float())
+            if self._use_cuda:
+                var_obs = var_obs.cuda()
 
-            self._iter += 1
+            # make action
+            action_probs, value = self._model.forward(var_obs.unsqueeze(0))
+            action = torch.multinomial(action_probs, 1).data[0, 0]
+            obs, reward, done, _ = self.env.step(action)
+            obs = self._preprocess_obs(obs)
+
+            # save reward, action_probs and value
+            var_batch_action_probs.append(action_probs[0, action])
+            var_batch_values.append(value)
+            batch_rewards.append(reward)
+            var_episode_values = value
+
+            # update policy
+            if len(var_batch_values) == self.batch_size:
+                var_action_probs = torch.cat(var_batch_action_probs)
+                var_values = torch.cat(var_batch_values)
+                returns = self._approx_return(batch_rewards, obs)
+                var_returns = Variable(torch.Tensor(returns))
+                if self._use_cuda:
+                    var_returns = var_returns.cuda()
+
+                loss = - torch.mean(
+                    torch.log(var_action_probs) * (var_returns - var_values))
+
+                # update model
+                self._optimizer.zero_grad()
+                loss.backward(retain_graph=True)
+                self._optimizer.step()
+
+                var_batch_action_probs = []
+                var_batch_values = []
+                batch_rewards = []
+
+            # update value
+            if reward != 0:
+                var_values = torch.cat(var_episode_values)
+
+                # TODO: Consider gamma when calculate loss
+                loss = self._value_coef * (var_values - reward) ** 2 \
+                    / self.batch_size
+
+                # update model
+                self._optimizer.zero_grad()
+                loss.backward(retain_graph=True)
+                self._optimizer.step()
+
+                var_episode_values = []
+
+            # print and log
+            rewards[-1] += reward
+            if done:
+                obs = self._preprocess_obs(self.env.reset())
+                if self.log_file is not None:
+                    fp_log.write('{},{}\n'.format(self._n_steps, rewards[-1]))
+
+                print('{} {}'
+                      .format(self._n_steps, rewards[-1]))
+
+                mean_reward = sum(rewards[-100:]) / len(rewards[-100:])
+                if mean_reward > best_mean_reward:
+                    best_mean_reward = mean_reward
+                    torch.save({'model': self._model.state_dict()},
+                               'model-pg-pong')
+
+                rewards.append(0)
+
+            self._n_steps += 1
 
     def make_action(self, observation, test=True):
         """
@@ -141,7 +180,7 @@ class Agent_PG():
                            .float().unsqueeze(0))
         if self._use_cuda:
             var_obs = var_obs.cuda()
-        action_probs = self._model.forward(var_obs)
+        action_probs, _ = self._model.forward(var_obs)
 
         # sample action
         action = torch.multinomial(action_probs, 1).data[0, 0]
@@ -149,9 +188,9 @@ class Agent_PG():
         return action
 
 
-class Policy(torch.nn.Module):
+class PolicyValueNet(torch.nn.Module):
     def __init__(self, input_shape, n_actions):
-        super(Policy, self).__init__()
+        super(PolicyValueNet, self).__init__()
         self.cnn = torch.nn.Sequential(
             torch.nn.Conv2d(1, 16, 8, stride=4),
             torch.nn.ReLU(),
@@ -169,13 +208,18 @@ class Policy(torch.nn.Module):
         #         n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
         #         m.weight.data.normal_(0, math.sqrt(1. / n))
 
-        self.mlp = torch.nn.Sequential(
+        self.mlp_action = torch.nn.Sequential(
             torch.nn.Linear(2048, n_actions),
             torch.nn.Softmax()
+        )
+        self.mlp_advantage = torch.nn.Sequential(
+            torch.nn.Linear(2048, 256),
+            torch.nn.ReLU(),
+            torch.nn.Linear(256, 1)
         )
 
     def forward(self, frames):
         frames = frames.unsqueeze(-3)
         x = self.cnn(frames)
         x = x.view(x.size(0), -1)
-        return self.mlp(x)
+        return self.mlp_action(x), self.mlp_advantage(x)
