@@ -90,7 +90,7 @@ class Agent_PG():
         batch_rewards = []
 
         # used to update value
-        var_episode_values = []
+        # var_episode_values = []
 
         obs = self._preprocess_obs(self.env.reset())
         while self._n_steps < self._max_timesteps:
@@ -102,7 +102,7 @@ class Agent_PG():
             # make action
             action_probs, value = self._model.forward(var_obs.unsqueeze(0))
             action = torch.multinomial(action_probs, 1).data[0, 0]
-            entropy = torch.sum(action_probs * torch.log(action_probs))
+            entropy = - torch.sum(action_probs * torch.log(action_probs))
             obs, reward, done, _ = self.env.step(action)
             obs = self._preprocess_obs(obs)
 
@@ -111,7 +111,7 @@ class Agent_PG():
             var_batch_entropy += entropy
             var_batch_values.append(value[0, 0])
             batch_rewards.append(reward)
-            var_episode_values.append(value)
+            # var_episode_values.append(value)
 
             # update policy
             if len(var_batch_values) == self.batch_size:
@@ -122,13 +122,16 @@ class Agent_PG():
                 if self._use_cuda:
                     var_returns = var_returns.cuda()
 
-                loss = - torch.mean(
+                policy_loss = - torch.mean(
                     torch.log(var_action_probs) * (var_returns - var_values)) \
                     - 1e-3 * var_batch_entropy / self.batch_size
 
+                value_loss = torch.mean((var_values - var_returns)**2)
+
                 # update model
                 self._optimizer.zero_grad()
-                loss.backward(retain_graph=True)
+                (policy_loss + self._value_coef * value_loss) \
+                    .backward(retain_graph=True)
                 torch.nn.utils.clip_grad_norm(self._model.parameters(),
                                               5, 'inf')
                 self._optimizer.step()
@@ -139,18 +142,18 @@ class Agent_PG():
                 batch_rewards = []
 
             # update value
-            if reward != 0:
-                var_values = torch.cat(var_episode_values)
+            # if reward != 0:
+            #     var_values = torch.cat(var_episode_values)
 
-                # TODO: Consider gamma when calculate loss
-                loss = self._value_coef * torch.mean((var_values - reward)**2)
+            #     # TODO: Consider gamma when calculate loss
+            #     loss = self._value_coef * torch.sum((var_values - reward)**2) / self.batch_size
 
-                # update model
-                self._optimizer.zero_grad()
-                loss.backward(retain_graph=True)
-                self._optimizer.step()
+            #     # update model
+            #     self._optimizer.zero_grad()
+            #     loss.backward(retain_graph=True)
+            #     self._optimizer.step()
 
-                var_episode_values = []
+            #     var_episode_values = []
 
             # print and log
             rewards[-1] += reward
@@ -218,13 +221,15 @@ class PolicyValueNet(torch.nn.Module):
         #         m.weight.data.normal_(0, math.sqrt(1. / n))
 
         self.mlp_action = torch.nn.Sequential(
-            torch.nn.Linear(2048, n_actions),
+            torch.nn.Linear(2048, 128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128, n_actions),
             torch.nn.Softmax()
         )
         self.mlp_advantage = torch.nn.Sequential(
-            torch.nn.Linear(2048, 256),
+            torch.nn.Linear(2048, 128),
             torch.nn.ReLU(),
-            torch.nn.Linear(256, 1)
+            torch.nn.Linear(128, 1)
         )
 
     def forward(self, frames):

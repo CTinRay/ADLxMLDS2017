@@ -81,12 +81,15 @@ class Agent_DQN:
         states0, actions, rewards, states1, dones, weights = tensor_replay
 
         # predict target with target network
+        max_actions = self._model.forward(Variable(states1.float())).max(-1)[1]
         var_target_action_value = \
-            target_q.forward(Variable(states1.float())).max(-1)[0]
+            target_q.forward(Variable(states1.float())) \
+                    .gather(1, max_actions.unsqueeze(-1)) \
+                    .squeeze(-1)
         var_target = Variable(rewards.float()) \
             + self.gamma * var_target_action_value \
             * (Variable(-dones.float() + 1))
-        var_target = var_target.unsqueeze(-1)
+        var_target = var_target.unsqueeze(-1).detach()
 
         # gradient descend model
         var_states0 = Variable(states0.float())
@@ -107,11 +110,11 @@ class Agent_DQN:
         self._optimizer.step()
 
         # update experience priorities
-        indices = replay[-1]
+        # indices = replay[-1]
         loss = torch.abs(var_action_value - var_target).data
-        new_priority = loss + self.prioritized_replay_eps
-        new_priority = new_priority.view(-1,).cpu().tolist()
-        self.replay_buffer.update_priorities(indices, new_priority)
+        # new_priority = loss + self.prioritized_replay_eps
+        # new_priority = new_priority.view(-1,).cpu().tolist()
+        # self.replay_buffer.update_priorities(indices, new_priority)
 
         return np.mean(loss.cpu().numpy())
 
