@@ -34,7 +34,8 @@ def main(args):
         index_end = len(timesteps) - index_start + 1
 
         label = args.labels[i] if args.labels is not None else None
-        ax.plot(timesteps[index_start:index_end], rewards, label=label)
+        ax.plot(timesteps[index_start:index_end], rewards,
+                label=label, linewidth=1.0)
 
     ax.legend()
     fig.savefig(args.output)
