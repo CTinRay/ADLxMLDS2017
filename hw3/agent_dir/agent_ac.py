@@ -2,11 +2,11 @@ import math
 import pdb
 import torch
 from torch.autograd import Variable
-import scipy.misc
 import numpy as np
+import scipy.misc
 
 
-class Agent_PG():
+class Agent_AC():
     def __init__(self, env, args):
         """
         Initialize every things you need here.
@@ -23,7 +23,6 @@ class Agent_PG():
         self._use_cuda = torch.cuda.is_available()
         if self._use_cuda:
             self._model = self._model.cuda()
-            torch.cuda.manual_seed_all(0)
         self._optimizer = torch.optim.RMSprop(self._model.parameters(),
                                               lr=1e-4)
 
@@ -43,62 +42,54 @@ class Agent_PG():
         pass
 
     def _preprocess_obs(self, obs):
-        obs = obs[34:194]
-        # obs = obs[::2, ::2, :1]
-        # obs = obs[:, :, 0]
+        obs = obs[34:194].astype(np.uint8)
+        # obs = obs[::2, ::2, :]
         obs[obs[:, :, 0] == 144] = 0
         obs[obs[:, :, 0] == 109] = 0
-        # obs[obs != 0] = 1
-        # processed = obs - self._prev_obs
-        obs = 0.2126 * obs[:, :, 0] \
-              + 0.7152 * obs[:, :, 1] \
-              + 0.0722 * obs[:, :, 2]
-        obs = obs.astype(np.uint8)
-        obs = scipy.misc.imresize(obs, (80, 80)).astype(float)
+        obs = 0.2126 * obs[:, :, 0] + 0.7152 * obs[:, :, 1] + 0.0722 * obs[:, :, 2]
+        obs = scipy.misc.imresize(obs, (80, 80, 3)).astype(float)
         processed = obs - self._prev_obs
         self._prev_obs = obs
         return processed
 
-    def _train_iteration(self, mean):
-        obs = self.env.reset()
+    def _train_iteration(self, obs, mean):
         n_steps = 0
+        total_log_probs = 0
+        total_rewards = 0
+        total_entropy = 0
         done = False
-        rewards = [0]
-        self._optimizer.zero_grad()
-        while not done:
-            total_log_probs = 0
-            total_entropy = 0
-            while rewards[-1] == 0:
-                # calculate action probability
-                var_obs = Variable(torch.from_numpy(self._preprocess_obs(obs))
-                                   .float().unsqueeze(0))
-                if self._use_cuda:
-                    var_obs = var_obs.cuda()
-                action_probs = self._model.forward(var_obs)
-                entropy = - (action_probs * action_probs.log()).sum()
-                total_entropy += entropy
+        while total_rewards == 0 and not done:
+            # calculate action probability
+            var_obs = Variable(torch.from_numpy(self._preprocess_obs(obs))
+                               .float().unsqueeze(0))
+            if self._use_cuda:
+                var_obs = var_obs.cuda()
+            action_probs = self._model.forward(var_obs)
+            entropy = - (action_probs * action_probs.log()).sum()
+            total_entropy += entropy
 
-                # sample action
-                action = torch.multinomial(action_probs, 1).data[0, 0]
+            # sample action
+            action = torch.multinomial(action_probs, 1).data[0, 0]
 
-                obs, reward, done, _ = self.env.step(action)
+            obs, reward, done, _ = self.env.step(action)
 
-                # accumulate reward and probability
-                rewards[-1] += reward
-                total_log_probs += action_probs[:, action].log()
+            # accumulate reward and probability
+            total_rewards += reward
+            total_log_probs += action_probs[:, action].log()
 
-                n_steps += 1
+            n_steps += 1
 
-            loss = -(reward - mean) * total_log_probs
-            loss.backward()
-            rewards.append(0)
+        loss = -(total_rewards - mean) * total_log_probs - 1e-5 * total_entropy
 
-        torch.nn.utils.clip_grad_norm(self._model.parameters(),
-                                      5, 'inf')
-        self._optimizer.step()
-        self._optimizer.zero_grad()
+        loss.backward()
+        if self._iter % self.batch_size == 0:
+            self._optimizer.step()
+            self._optimizer.zero_grad()
 
-        return rewards, n_steps
+        if done:
+            obs = self.env.reset()
+
+        return obs, total_rewards, n_steps
 
     def train(self):
         if self.log_file is not None:
@@ -106,18 +97,19 @@ class Agent_PG():
 
         total_steps = 0
         rewards = [-1.0]
+        obs = self.env.reset()
+        self._optimizer.zero_grad()
         while self._iter < self._max_iters:
             mean = sum(rewards[-2000:]) / len(rewards[-2000:])
-            reward, n_steps = self._train_iteration(mean)
+            obs, reward, n_steps = self._train_iteration(obs, mean)
             total_steps += n_steps
-            rewards += reward
+            rewards.append(reward)
 
             if self.log_file is not None:
-                fp_log.write('{},{}\n'.format(total_steps, sum(reward)))
+                fp_log.write('{},{}\n'.format(total_steps, reward))
 
-            print(sum(reward))
             if self._iter % 10 == 0:
-                print('%d %d %f' % (self._iter, n_steps, mean))
+                print('%d %d %f' % (n_steps, self._iter, mean))
 
             if self._iter % 100 == 0:
                 torch.save({'model': self._model.state_dict(),
@@ -170,9 +162,7 @@ class Policy(torch.nn.Module):
         #         m.weight.data.normal_(0, math.sqrt(1. / n))
 
         self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(2048, 128),
-            torch.nn.ReLU(),
-            torch.nn.Linear(128, n_actions),
+            torch.nn.Linear(2048, n_actions),
             torch.nn.Softmax()
         )
 
