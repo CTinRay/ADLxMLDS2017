@@ -51,6 +51,8 @@
 \subsubsection*{前處理}
 
 \begin{itemize}
+\item 忽略分數與底部的邊界，僅擷取遊戲畫面中間從從第 34 開始的 160 列像素。
+\item 將紅色數值等於 144 或 109 的像素設成 0 ，以消除背景的顏色。
 \item 使用亮度轉換公式將紅綠藍三色轉換成灰階
   \begin{equation*}
     \text{Luminance} = 0.2126 \times \text{R} + 0.7152 \times \text{G} + 0.0722 \times \text{B}    
@@ -127,7 +129,7 @@
 \centering
 \begin{subfigure}{.45\textwidth}
   \includegraphics[width=\linewidth]{figures/pg.png}
-  \caption{Atari 遊戲 Pong 每 30 場遊戲（21 分）平均贏球數量與訓練時間}
+  \caption{Atari 遊戲 Pong 每 30 場遊戲（21 分）平均分數（贏球數減輸球數）與訓練時間}
   \label{fig:learning-curve-pg}
 \end{subfigure}
 \begin{subfigure}{.45\textwidth}
