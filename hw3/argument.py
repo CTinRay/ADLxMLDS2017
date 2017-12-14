@@ -13,9 +13,11 @@ def add_arguments(parser):
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--prioritized_replay_eps', type=float, default=1e-4)
     parser.add_argument('--target_network_update_freq', type=int,
-                        default=2000)
+                        default=5000)
     parser.add_argument('--buffer_size', type=int, default=1e4)
     parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--save_freq', type=int, default=2000)
     parser.add_argument('--log_file', type=str, default='log.txt')
+    parser.add_argument('--model_pg', type=str, default='models/model-pg-pong-8.33')
+    parser.add_argument('--model_dqn', type=str, default='models/model-61.07')
     return parser

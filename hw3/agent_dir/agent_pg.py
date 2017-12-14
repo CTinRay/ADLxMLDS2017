@@ -30,9 +30,9 @@ class Agent_PG():
         if args.test_pg or args.model:
             print('loading trained model')
             if self._use_cuda:
-                ckp = torch.load(args.test_pg)
+                ckp = torch.load(args.model_pg)
             else:
-                ckp = torch.load(args.test_pg,
+                ckp = torch.load(args.model_pg,
                                  map_location=lambda storage, loc: storage)
 
             self._model.load_state_dict(ckp['model'])

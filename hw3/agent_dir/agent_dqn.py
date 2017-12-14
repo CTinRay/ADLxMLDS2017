@@ -34,9 +34,10 @@ class Agent_DQN:
         if args.test_dqn:
             print('loading trained model')
             if self._use_cuda:
-                ckp = torch.load(args.test_dqn)
+                ckp = torch.load(args.model_dqn)
+                torch.cuda.manual_seed_all(0)
             else:
-                ckp = torch.load(args.test_dqn,
+                ckp = torch.load(args.model_dqn,
                                  map_location=lambda storage, loc: storage)
 
             self._model.load_state_dict(ckp['model'])
@@ -110,11 +111,11 @@ class Agent_DQN:
         self._optimizer.step()
 
         # update experience priorities
-        # indices = replay[-1]
+        indices = replay[-1]
         loss = torch.abs(var_action_value - var_target).data
-        # new_priority = loss + self.prioritized_replay_eps
-        # new_priority = new_priority.view(-1,).cpu().tolist()
-        # self.replay_buffer.update_priorities(indices, new_priority)
+        new_priority = loss + self.prioritized_replay_eps
+        new_priority = new_priority.view(-1,).cpu().tolist()
+        self.replay_buffer.update_priorities(indices, new_priority)
 
         return np.mean(loss.cpu().numpy())
 
