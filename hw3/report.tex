@@ -78,7 +78,7 @@
 
 \subsubsection*{最佳化方式}
 
-使用 RMSprop ，學習率等於 1e-4 。
+使用 RMSprop ，學習率等於 $10^{-4}$ 。
 
 \subsection{DQN}
 
@@ -104,7 +104,7 @@
 
 \subsubsection*{最佳化方式}
 
-使用 Adam ，學習率等於 1e-4 。
+使用 Adam ，學習率等於 $10^{-4}$ 。
 
 \subsubsection*{演算法超參數}
 
@@ -152,7 +152,12 @@
 
 這邊試著使用 Double-DQN 和 Prioritized Replay Buffer 實驗在 Atari 的遊戲 Atlantis 上。\\
 
-Double-DQN 主要是為了解決 DQN 容易高估數值。原先的 DQN 因為都是選擇最大的數值，所以即使模型的預測錯誤也有可能偏低，但往往都是偏高的被考慮到，從而累積出更大的錯誤。Double-DQN 提出了在計算目標數值時，不要使用預測數值的網路選擇最好的動作，並證明了如此一來 Double-DQN 將不會高估。\\
+Double-DQN 主要是為了解決 DQN 容易高估數值。原先的 DQN 因為都是選擇最大的數值，所以即使模型的預測錯誤也有可能偏低，但往往都是偏高的被考慮到，從而累積出更大的錯誤。Double-DQN 提出了在計算目標數值時，不要使用預測數值的網路選擇最好的動作，並證明了如此一來 Double-DQN 將不會高估。實做上，也就是在計算目標數值時使用線上的參數：
+
+\begin{equation*}
+  Y_{target} = R_t + \gamma Q_{target}(s_{t+1}, \arg \max_a Q(s_{t+1}, a))
+\end{equation*}
+
 
 Prioritized replay 則是改變過去的經驗在用來訓練網路時被取樣到的機率分佈，使得過去有較高預測錯誤的樣本更容易被取樣到，達到加快訓練速度的效果。\\
 
@@ -170,7 +175,17 @@ Prioritized replay 則是改變過去的經驗在用來訓練網路時被取樣�
 
 \section{Other RL method: Actor Critic}
 
-一般的 Policy Gradient （REINFORCE Algorithm） 每次遊戲只能更新一次參數，對於經驗的使用效率非常不高。Actor Critic 結合了預測獎勵的 value function ，可以不用等到遊戲結束才能更新參數，所以理論上可以訓練的比較快。這邊試著實做了 Actor Critic 的演算法，其學習曲線如圖 \ref{fig:learning-curve-actor-critic} 。在圖中可以看到，在訓練過程後期的某個時間開始，分數不升反降。這推測有可能是因為這個 Actor Critic 沒有加入 replay buffer ，或是出現了一些數值上不穩定的狀況產生。
+一般的 Policy Gradient （REINFORCE Algorithm） 每次遊戲只能更新一次參數，對於經驗的使用效率非常不高。Actor Critic 結合了預測獎勵的 value function ，可以不用等到遊戲結束才能更新參數，所以理論上可以訓練的比較快。這邊試著實做了 Actor Critic 的演算法，每 32 步就更新一次 policy network 與 value network
+
+\begin{align*}
+  & \theta^{\pi} \leftarrow \theta^{\pi} + \eta \nabla \mathcal{R}(\theta^\pi) \\
+  & \nabla \mathcal{R}(\theta^\pi) = \sum_t (\mathrm{Return}(s_t) - V^\pi(s_t)) \nabla \log p(a_t | s_t, \theta^\pi) \\
+  & \mathrm{Return}(s_t) = r_t + V^\pi(s_{t+1}) \\
+  & \theta^{V} \leftarrow \theta^{V} + \eta \nabla V(\theta^V) \\
+  & \nabla V(\theta^V) = \nabla (V(s_t) - (r_t + \gamma V(s_{t+1})))^2 
+\end{align*}
+
+其學習曲線如圖 \ref{fig:learning-curve-actor-critic} 。在圖中可以看到，在訓練過程後期的某個時間開始，分數不升反降。這推測有可能是因為這個 Actor Critic 沒有加入 replay buffer ，或是出現了一些數值上不穩定的狀況產生。
 
 \begin{figure}[h]
   \centering
