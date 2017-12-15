@@ -111,6 +111,7 @@
 \begin{itemize}
 \item 獎勵的衰退 $\gamma$ ：0.999 。
 \item batch 大小：32 。
+\item Replay buffer 大小：10000 。
 \item 每次使用梯度上升更新網路的時間間隔： 4 步。
 \item 同步參數到目標網路更新的間隔：每隔 5000 次更新，也就是 20000 步。
 \item $\epsilon$-greedy 探索的參數 $\epsilon = \max(1 -  0.9 \cdot \frac{t}{400000}, 0.1 - 0.09 \cdot \frac{t}{4000000}, 0.01)$ ，其中 $t$ 為網路更新的次數。
