@@ -186,7 +186,7 @@ Prioritized replay 則是改變過去的經驗在用來訓練網路時被取樣�
   & \nabla V(\theta^V) = \nabla (V(s_t) - (r_t + \gamma V(s_{t+1})))^2 
 \end{align*}
 
-其學習曲線如圖 \ref{fig:learning-curve-actor-critic} 。在圖中可以看到，在訓練過程後期的某個時間開始，分數不升反降。這推測有可能是因為這個 Actor Critic 沒有加入 replay buffer ，或是出現了一些數值上不穩定的狀況產生。
+其學習曲線如圖 \ref{fig:learning-curve-actor-critic} 。在圖中可以看到，Actor Critic 前期的確比純粹的 REINFORCE 好，但在訓練過程後期的某個時間開始，分數不升反降。這推測有可能是因為這個 Actor Critic 沒有加入 replay buffer ，或是出現了一些數值上不穩定的狀況產生。
 
 \begin{figure}[h]
   \centering
