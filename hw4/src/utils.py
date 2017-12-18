@@ -22,9 +22,9 @@ class FakeDataset(Dataset):
     def __getitem__(self, index):
         item = {}
         item['img'] = skimage.io.imread(self._img_files[index])
-        item['img'] = skimage.transform.resize(item['img'],
-                                               (64, 64),
-                                               mode='constant')
+        # item['img'] = skimage.transform.resize(item['img'],
+        #                                        (64, 64),
+        #                                        mode='constant')
         item['img'] = np.transpose(item['img'], [2, 0, 1]).astype(np.float32)
 
         truth_label = self._labels[index]
@@ -54,9 +54,9 @@ class RealDataset(Dataset):
         item = {
             'img': skimage.io.imread(self._img_files[index]),
             'label': self._labels[index]}
-        item['img'] = skimage.transform.resize(item['img'],
-                                               (64, 64),
-                                               mode='constant')
+        # item['img'] = skimage.transform.resize(item['img'],
+        #                                        (64, 64),
+        #                                        mode='constant')
         item['img'] = np.transpose(item['img'], [2, 0, 1]).astype(np.float32)
         return item
 
@@ -114,7 +114,7 @@ class DataProcessor:
                     self.eye_tag_dict[tag] = len(self.eye_tag_dict)
 
     def check_fake_label(self, truth_label, label):
-        return (truth_label == label).all()
+        return (truth_label != label).any()
         # # check if hair tag is different
         # truth_hair_label = truth_label[:len(self._hair_tag_dict)]
         # hair_label = label[:len(self._hair_tag_dict)]

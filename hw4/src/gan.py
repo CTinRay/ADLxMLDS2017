@@ -1,5 +1,7 @@
 import pdb
+import skimage.io
 import torch
+from tqdm import tqdm
 from torch.autograd import Variable
 from nets import GeneratorNet, DiscriminatorNet
 
@@ -35,6 +37,8 @@ class GAN:
             self._discriminator.parameters(),
             lr=0.0002)
 
+        self._n_epochs = 0
+
     def train(self, real_dataset, fake_dataset):
         data_real = torch.utils.data.DataLoader(
             real_dataset,
@@ -48,7 +52,9 @@ class GAN:
             num_workers=1)
 
         for epoch in range(self._max_epochs):
-            for batch_real in data_real:
+            mean_loss_d = 0
+            mean_loss_g = 0
+            for batch_real in tqdm(data_real):
                 batch_fake = iter(data_fake).next()
                 for iter_d in range(self._n_iters_d):
                     condition_real = Variable(batch_real['label'])
@@ -76,11 +82,35 @@ class GAN:
                     loss_d.backward()
                     self._optimizer_d.step()
 
+                    # clip weights
+                    for p in self._discriminator.parameters():
+                        p.data.clamp_(-0.01, 0.01)
+
+                    mean_loss_d += loss_d.data / self._n_iters_d \
+                        * self._batch_size / len(fake_dataset)
+
                 img_gen = self._generator.forward(condition_real)
                 d_gen = self._discriminator(img_gen, condition_real)
 
-                loss_g = torch.mean(d_gen)
+                loss_g = -torch.mean(d_gen)
 
                 self._optimizer_g.zero_grad()
                 loss_g.backward()
                 self._optimizer_g.step()
+
+                mean_loss_g += loss_g.data \
+                    * self._batch_size / len(fake_dataset)
+
+            print('mean generator loss = {}, mean discriminator loss = {}'
+                  .format(mean_loss_g[0],
+                          mean_loss_d[0]))
+            if epoch % 10 == 0:
+                torch.save(
+                    {'epoch': epoch,
+                     'generator': self._generator.state_dict(),
+                     'discriminator': self._discriminator.state_dict()},
+                    'model-epoch-%d' % epoch)
+                imgs = img_gen.data.cpu().transpose(-1, -3) \
+                                         .numpy().astype(int)
+                skimage.io.imsave('img-epoch-%d.jpg' % epoch,
+                                  imgs[0])

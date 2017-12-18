@@ -1,3 +1,4 @@
+import pdb
 import torch
 from torch.autograd import Variable
 
@@ -13,16 +14,16 @@ class GeneratorNet(torch.nn.Module):
             torch.nn.ConvTranspose2d(dim_condition + dim_noise,
                                      256, 4, 1, 0),
             # 4 x 4
-            torch.nn.ReLU(),
+            torch.nn.ELU(),
             torch.nn.ConvTranspose2d(256, 128, 4, 2, 1),
             # 8 x 8
-            torch.nn.ReLU(),
+            torch.nn.ELU(),
             torch.nn.ConvTranspose2d(128, 64, 4, 2, 1),
             # 16 x 16
-            torch.nn.ReLU(),
+            torch.nn.ELU(),
             torch.nn.ConvTranspose2d(64, 32, 4, 2, 1),
             # 32 x 32
-            torch.nn.ReLU(),
+            torch.nn.ELU(),
             torch.nn.ConvTranspose2d(32, 3, 4, 2, 1)
             # 64 x 64
         )
