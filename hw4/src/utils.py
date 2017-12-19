@@ -7,57 +7,54 @@ import torch
 from torch.utils.data import Dataset
 
 
-class FakeDataset(Dataset):
-    def __init__(self, img_dir, labels, check_fake_fn):
-        super(FakeDataset, self).__init__()
+class ImgDataset(Dataset):
+    def __init__(self, img_dir, labels):
+        super(ImgDataset, self).__init__()
         self._img_files = [os.path.join(img_dir, filename)
                            for filename in os.listdir(img_dir)]
         self._labels = labels
-        self._check_fake_fn = check_fake_fn
         assert len(self._img_files) == len(self._labels)
 
     def __len__(self):
         return len(self._img_files)
 
+    def _get_img(self, index):
+        img = skimage.io.imread(self._img_files[index])
+        img = img / 256 - 0.5
+        img = np.transpose(img, [2, 0, 1]).astype(np.float32)
+        return img
+
+
+class FakeDataset(ImgDataset):
+    def __init__(self, img_dir, labels, check_fake_fn):
+        super(FakeDataset, self).__init__(img_dir, labels)
+        self._check_fake_fn = check_fake_fn
+
     def __getitem__(self, index):
-        item = {}
-        item['img'] = skimage.io.imread(self._img_files[index])
-        # item['img'] = skimage.transform.resize(item['img'],
-        #                                        (64, 64),
-        #                                        mode='constant')
-        item['img'] = np.transpose(item['img'], [2, 0, 1]).astype(np.float32)
-
         truth_label = self._labels[index]
-
         rand_index = random.randrange(len(self._labels))
-        item['label'] = self._labels[rand_index]
-
-        while not self._check_fake_fn(truth_label, item['label']):
+        fake_label = self._labels[rand_index]
+        while not self._check_fake_fn(truth_label, fake_label):
             rand_index = random.randrange(len(self._labels))
-            item['label'] = self._labels[rand_index]
+            fake_label = self._labels[rand_index]
 
+        img = self._get_img(index)
+        item = {'img': img,
+                'label': fake_label}
         return item
 
 
-class RealDataset(Dataset):
+class RealDataset(ImgDataset):
     def __init__(self, img_dir, labels):
-        super(RealDataset, self).__init__()
-        self._img_files = [os.path.join(img_dir, filename)
-                           for filename in os.listdir(img_dir)]
-        self._labels = labels
-        assert len(self._img_files) == len(self._labels)
+        super(RealDataset, self).__init__(img_dir, labels)
 
     def __len__(self):
         return len(self._img_files)
 
     def __getitem__(self, index):
         item = {
-            'img': skimage.io.imread(self._img_files[index]),
+            'img': self._get_img(index),
             'label': self._labels[index]}
-        # item['img'] = skimage.transform.resize(item['img'],
-        #                                        (64, 64),
-        #                                        mode='constant')
-        item['img'] = np.transpose(item['img'], [2, 0, 1]).astype(np.float32)
         return item
 
 

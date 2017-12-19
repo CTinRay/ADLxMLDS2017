@@ -111,6 +111,6 @@ class GAN:
                      'discriminator': self._discriminator.state_dict()},
                     'model-epoch-%d' % epoch)
                 imgs = img_gen.data.cpu().transpose(-1, -3) \
-                                         .numpy().astype(int)
+                                         .numpy()
                 skimage.io.imsave('img-epoch-%d.jpg' % epoch,
                                   imgs[0])

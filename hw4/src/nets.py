@@ -7,9 +7,9 @@ class GeneratorNet(torch.nn.Module):
     def __init__(self, dim_condition, dim_noise):
         super(GeneratorNet, self).__init__()
         self.register_buffer('noise_mean',
-                             Variable(torch.zeros(dim_noise)))
+                             torch.zeros(dim_noise))
         self.register_buffer('noise_std',
-                             Variable(torch.ones(dim_noise)))
+                             torch.ones(dim_noise))
         self.deconv_layers = torch.nn.Sequential(
             torch.nn.ConvTranspose2d(dim_condition + dim_noise,
                                      256, 4, 1, 0),
@@ -24,15 +24,16 @@ class GeneratorNet(torch.nn.Module):
             torch.nn.ConvTranspose2d(64, 32, 4, 2, 1),
             # 32 x 32
             torch.nn.ELU(),
-            torch.nn.ConvTranspose2d(32, 3, 4, 2, 1)
+            torch.nn.ConvTranspose2d(32, 3, 4, 2, 1),
             # 64 x 64
+            torch.nn.Tanh()
         )
 
     def forward(self, condition):
         batch_size = condition.size(0)
         noise = torch.normal(
-            torch.stack([self.noise_mean] * batch_size, dim=0),
-            torch.stack([self.noise_std] * batch_size, dim=0)
+            torch.stack([Variable(self.noise_mean)] * batch_size, dim=0),
+            torch.stack([Variable(self.noise_std)] * batch_size, dim=0)
         )
         net_input = torch.cat([condition, noise], dim=1)
         # [batch, dim_condition + dim_noise]
