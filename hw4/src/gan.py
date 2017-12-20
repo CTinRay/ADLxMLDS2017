@@ -114,3 +114,23 @@ class GAN:
                                          .numpy()
                 skimage.io.imsave('img-epoch-%d.jpg' % epoch,
                                   imgs[0])
+
+    def load(self, filename):
+        ckp = torch.load(filename)
+        self._generator.load_state_dict(ckp['generator'])
+        self._discriminator.load_state_dict(ckp['discriminator'])
+
+    def inference(self, condition, batch_size=64):
+        condition = torch.from_numpy(condition).float()
+        results = []
+        for b in range(0, condition.shape[0], batch_size):
+            batch_condition = condition[b: b + batch_size]
+            batch_condition = Variable(batch_condition)
+            if self._use_cuda:
+                batch_condition = batch_condition.cuda()
+            batch_result = self._generator.forward(batch_condition) \
+                                          .data.transpose(-1, -3)
+            results.append(batch_result)
+
+        results = torch.cat(results, dim=0)
+        return results.cpu().numpy()
