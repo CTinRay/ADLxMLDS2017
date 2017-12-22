@@ -1,3 +1,4 @@
+import os
 import pdb
 import skimage.io
 import torch
@@ -13,11 +14,13 @@ class GAN:
                  learning_rate=0.0002,
                  batch_size=64,
                  max_epochs=300,
-                 n_iters_d=4,
+                 g_update_interval=5,
+                 save_interval=10,
+                 save_dir='./',
                  use_cuda=None):
         self._batch_size = batch_size
         self._max_epochs = max_epochs
-        self._n_iters_d = n_iters_d
+        self._g_update_interval = g_update_interval
         self._use_cuda = use_cuda
         if self._use_cuda is None:
             self._use_cuda = torch.cuda.is_available()
@@ -31,13 +34,14 @@ class GAN:
 
         self._optimizer_g = torch.optim.RMSprop(
             self._generator.parameters(),
-            lr=0.0002
-        )
+            lr=0.0002)
         self._optimizer_d = torch.optim.RMSprop(
             self._discriminator.parameters(),
             lr=0.0002)
 
         self._n_epochs = 0
+        self._save_interval = save_interval
+        self._save_dir = save_dir
 
     def train(self, real_dataset, fake_dataset):
         data_real = torch.utils.data.DataLoader(
@@ -52,64 +56,70 @@ class GAN:
             num_workers=1)
 
         for epoch in range(self._max_epochs):
-            mean_loss_d = 0
-            mean_loss_g = 0
-            for batch_real in tqdm(data_real):
-                batch_fake = iter(data_fake).next()
-                for iter_d in range(self._n_iters_d):
-                    condition_real = Variable(batch_real['label'])
-                    img_real = Variable(batch_real['img'])
-                    condition_fake = Variable(batch_fake['label'])
-                    img_fake = Variable(batch_fake['img'])
+            loss_ds = []
+            loss_gs = []
+            for i, batch_real, batch_fake in \
+                tqdm(zip(range(len(data_real)),
+                         data_real, data_fake)):
 
-                    if self._use_cuda:
-                        condition_real = condition_real.cuda()
-                        img_real = img_real.cuda()
-                        condition_fake = condition_fake.cuda()
-                        img_fake = img_fake.cuda()
+                # train generator
+                condition_real = Variable(batch_real['label'])
+                img_real = Variable(batch_real['img'])
+                condition_fake = Variable(batch_fake['label'])
+                img_fake = Variable(batch_fake['img'])
 
-                    img_gen = self._generator.forward(condition_real)
-
-                    d_real = self._discriminator(img_real, condition_real)
-                    d_gen = self._discriminator(img_gen, condition_real)
-                    d_fake = self._discriminator(img_fake, condition_fake)
-
-                    loss_d = 0.5 * torch.mean(d_fake) \
-                        + 0.5 * torch.mean(d_gen) \
-                        - torch.mean(d_real)
-
-                    self._optimizer_d.zero_grad()
-                    loss_d.backward()
-                    self._optimizer_d.step()
-
-                    # clip weights
-                    for p in self._discriminator.parameters():
-                        p.data.clamp_(-0.01, 0.01)
-
-                    mean_loss_d += loss_d.data / self._n_iters_d \
-                        * self._batch_size / len(fake_dataset)
+                if self._use_cuda:
+                    condition_real = condition_real.cuda()
+                    img_real = img_real.cuda()
+                    condition_fake = condition_fake.cuda()
+                    img_fake = img_fake.cuda()
 
                 img_gen = self._generator.forward(condition_real)
+
+                d_real = self._discriminator(img_real, condition_real)
                 d_gen = self._discriminator(img_gen, condition_real)
+                d_fake = self._discriminator(img_fake, condition_fake)
 
-                loss_g = -torch.mean(d_gen)
+                loss_d = 0.5 * torch.mean(d_fake) \
+                    + 0.5 * torch.mean(d_gen) \
+                    - torch.mean(d_real)
 
-                self._optimizer_g.zero_grad()
-                loss_g.backward()
-                self._optimizer_g.step()
+                self._optimizer_d.zero_grad()
+                loss_d.backward()
+                self._optimizer_d.step()
 
-                mean_loss_g += loss_g.data \
-                    * self._batch_size / len(fake_dataset)
+                # clip weights
+                for p in self._discriminator.parameters():
+                    p.data.clamp_(-0.01, 0.01)
 
-            print('mean generator loss = {}, mean discriminator loss = {}'
-                  .format(mean_loss_g[0],
-                          mean_loss_d[0]))
-            if epoch % 10 == 0:
+                loss_ds.append(loss_d.data[0])
+
+                # train discriminator
+                if i % self._g_update_interval == 0:
+                    img_gen = self._generator.forward(condition_real)
+                    d_gen = self._discriminator(img_gen, condition_real)
+
+                    loss_g = -torch.mean(d_gen)
+
+                    self._optimizer_g.zero_grad()
+                    loss_g.backward()
+                    self._optimizer_g.step()
+
+                loss_gs.append(loss_g.data[0])
+
+            print('{} mean generator loss = {}, mean discriminator loss = {}'
+                  .format(epoch,
+                          sum(loss_gs) / len(loss_gs),
+                          sum(loss_ds) / len(loss_ds)))
+
+            if epoch % self._save_interval == 0:
+                filename = os.path.join(self._save_dir,
+                                        'model-epoch-%d' % epoch)
                 torch.save(
                     {'epoch': epoch,
                      'generator': self._generator.state_dict(),
                      'discriminator': self._discriminator.state_dict()},
-                    'model-epoch-%d' % epoch)
+                    filename)
                 imgs = img_gen.data.cpu().transpose(-1, -3) \
                                          .numpy()
                 skimage.io.imsave('img-epoch-%d.jpg' % epoch,
