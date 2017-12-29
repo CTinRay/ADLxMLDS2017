@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import pdb
 import skimage.io
@@ -15,12 +16,14 @@ class GAN:
                  batch_size=64,
                  max_epochs=300,
                  g_update_interval=5,
-                 save_interval=10,
+                 lambda_grad=15,
+                 save_interval=5,
                  save_dir='./',
                  use_cuda=None):
         self._batch_size = batch_size
         self._max_epochs = max_epochs
         self._g_update_interval = g_update_interval
+        self._lambda_grad = lambda_grad
         self._use_cuda = use_cuda
         if self._use_cuda is None:
             self._use_cuda = torch.cuda.is_available()
@@ -62,17 +65,21 @@ class GAN:
                 tqdm(zip(range(len(data_real)),
                          data_real, data_fake)):
 
-                # train generator
+                # train discriminator
                 condition_real = Variable(batch_real['label'])
                 img_real = Variable(batch_real['img'])
                 condition_fake = Variable(batch_fake['label'])
                 img_fake = Variable(batch_fake['img'])
+                alphas = Variable(torch.rand(img_real.shape[0], 1, 1, 1))
+                ones = torch.ones(img_real.shape[0], 1)
 
                 if self._use_cuda:
                     condition_real = condition_real.cuda()
                     img_real = img_real.cuda()
                     condition_fake = condition_fake.cuda()
                     img_fake = img_fake.cuda()
+                    alphas = alphas.cuda()
+                    ones = ones.cuda()
 
                 img_gen = self._generator.forward(condition_real)
 
@@ -80,21 +87,28 @@ class GAN:
                 d_gen = self._discriminator(img_gen, condition_real)
                 d_fake = self._discriminator(img_fake, condition_fake)
 
-                loss_d = 0.5 * torch.mean(d_fake) \
-                    + 0.5 * torch.mean(d_gen) \
-                    - torch.mean(d_real)
+                interpolates = img_real * alphas + img_gen * (1 - alphas)
+                d_interpolates = self._discriminator(interpolates,
+                                                     condition_real)
+                gradients = torch.autograd.grad(d_interpolates,
+                                                interpolates,
+                                                grad_outputs=ones,
+                                                create_graph=True)[0]
+                grad_penalty = torch.mean((gradients - 1) ** 2)
+
+                d_false = torch.max(torch.cat([d_fake, d_gen], dim=1),
+                                    dim=1)[0]
+                loss_d = torch.mean(d_false) \
+                    - torch.mean(d_real) \
+                    + self._lambda_grad * grad_penalty
 
                 self._optimizer_d.zero_grad()
                 loss_d.backward()
                 self._optimizer_d.step()
 
-                # clip weights
-                for p in self._discriminator.parameters():
-                    p.data.clamp_(-0.01, 0.01)
-
                 loss_ds.append(loss_d.data[0])
 
-                # train discriminator
+                # train generator
                 if i % self._g_update_interval == 0:
                     img_gen = self._generator.forward(condition_real)
                     d_gen = self._discriminator(img_gen, condition_real)
@@ -105,7 +119,7 @@ class GAN:
                     loss_g.backward()
                     self._optimizer_g.step()
 
-                loss_gs.append(loss_g.data[0])
+                    loss_gs.append(loss_g.data[0])
 
             print('{} mean generator loss = {}, mean discriminator loss = {}'
                   .format(epoch,
@@ -120,10 +134,10 @@ class GAN:
                      'generator': self._generator.state_dict(),
                      'discriminator': self._discriminator.state_dict()},
                     filename)
-                imgs = img_gen.data.cpu().transpose(-1, -3) \
-                                         .numpy()
+                imgs = ((img_gen.data.cpu().numpy() + 1) * 128).astype('uint8')
+                print(condition_real[0])
                 skimage.io.imsave('img-epoch-%d.jpg' % epoch,
-                                  imgs[0])
+                                  np.transpose(imgs[0], [1, 2, 0]))
 
     def load(self, filename):
         ckp = torch.load(filename)
@@ -138,8 +152,7 @@ class GAN:
             batch_condition = Variable(batch_condition)
             if self._use_cuda:
                 batch_condition = batch_condition.cuda()
-            batch_result = self._generator.forward(batch_condition) \
-                                          .data.transpose(-1, -3)
+            batch_result = self._generator.forward(batch_condition).data
             results.append(batch_result)
 
         results = torch.cat(results, dim=0)

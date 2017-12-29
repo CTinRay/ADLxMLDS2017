@@ -10,17 +10,16 @@ from torch.utils.data import Dataset
 class ImgDataset(Dataset):
     def __init__(self, img_dir, labels):
         super(ImgDataset, self).__init__()
-        self._img_files = [os.path.join(img_dir, filename)
-                           for filename in os.listdir(img_dir)]
+        self._img_dir = img_dir
         self._labels = labels
-        assert len(self._img_files) == len(self._labels)
 
     def __len__(self):
-        return len(self._img_files)
+        return len(self._labels)
 
     def _get_img(self, index):
-        img = skimage.io.imread(self._img_files[index])
-        img = img / 256 - 0.5
+        filename = os.path.join(self._img_dir, '%d.jpg' % index)
+        img = skimage.io.imread(filename)
+        img = img / 128 - 1.0
         img = np.transpose(img, [2, 0, 1]).astype(np.float32)
         return img
 
@@ -47,9 +46,6 @@ class FakeDataset(ImgDataset):
 class RealDataset(ImgDataset):
     def __init__(self, img_dir, labels):
         super(RealDataset, self).__init__(img_dir, labels)
-
-    def __len__(self):
-        return len(self._img_files)
 
     def __getitem__(self, index):
         item = {
@@ -111,7 +107,7 @@ class DataProcessor:
                     self.eye_tag_dict[tag] = len(self.eye_tag_dict)
 
     def check_fake_label(self, truth_label, label):
-        return (truth_label != label).any()
+        return label.sum() == 2 and (truth_label != label).any()
         # # check if hair tag is different
         # truth_hair_label = truth_label[:len(self._hair_tag_dict)]
         # hair_label = label[:len(self._hair_tag_dict)]

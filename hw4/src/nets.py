@@ -16,19 +16,23 @@ class GeneratorNet(torch.nn.Module):
             # 4 x 4
             torch.nn.BatchNorm2d(512),
             torch.nn.ReLU(),
-            torch.nn.ConvTranspose2d(512, 256, 4, 2, 1),
+            torch.nn.ConvTranspose2d(512, 256, 4, 2, 1,
+                                     bias=False),
             # 8 x 8
             torch.nn.BatchNorm2d(256),
             torch.nn.ReLU(),
-            torch.nn.ConvTranspose2d(256, 128, 4, 2, 1),
+            torch.nn.ConvTranspose2d(256, 128, 4, 2, 1,
+                                     bias=False),
             # 16 x 16
             torch.nn.BatchNorm2d(128),
             torch.nn.ReLU(),
-            torch.nn.ConvTranspose2d(128, 64, 4, 2, 1),
+            torch.nn.ConvTranspose2d(128, 64, 4, 2, 1,
+                                     bias=False),
             # 32 x 32
             torch.nn.BatchNorm2d(64),
             torch.nn.ReLU(),
-            torch.nn.ConvTranspose2d(64, 3, 4, 2, 1),
+            torch.nn.ConvTranspose2d(64, 3, 4, 2, 1,
+                                     bias=False),
             # 64 x 64
             torch.nn.Tanh()
         )
@@ -56,19 +60,19 @@ class DiscriminatorNet(torch.nn.Module):
         self.conv_layers1 = torch.nn.Sequential(
             torch.nn.Conv2d(3, 32, 4, 2, 1),
             # 32 x 32
-            torch.nn.BatchNorm2d(32),
+            # torch.nn.BatchNorm2d(32),
             torch.nn.LeakyReLU(),
             torch.nn.Conv2d(32, 64, 4, 2, 1),
             # 16 x 16
-            torch.nn.BatchNorm2d(64),
+            # torch.nn.BatchNorm2d(64),
             torch.nn.LeakyReLU(),
             torch.nn.Conv2d(64, 128, 4, 2, 1),
             # 8 x 8
-            torch.nn.BatchNorm2d(128),
+            # torch.nn.BatchNorm2d(128),
             torch.nn.LeakyReLU(),
             torch.nn.Conv2d(128, 256, 4, 2, 1),
             # 4 x 4
-            torch.nn.BatchNorm2d(256),
+            # torch.nn.BatchNorm2d(256),
             torch.nn.LeakyReLU()
         )
 

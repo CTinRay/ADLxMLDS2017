@@ -9,7 +9,7 @@ import traceback
 def main(args):
     data_processor = DataProcessor(args.img_dir, args.tag_file)
     dim_condition = data_processor.get_dim_condition()
-    gan = GAN(dim_condition, save_dir=args.save_dir, max_epochs=1500)
+    gan = GAN(dim_condition, save_dir=args.save_dir, max_epochs=500)
     gan.train(data_processor.get_real_dataset(),
               data_processor.get_fake_dataset())
 
