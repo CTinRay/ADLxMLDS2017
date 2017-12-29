@@ -1,0 +1,120 @@
+\documentclass[fleqn,a4paper,12pt]{article}
+\usepackage[top=1in, bottom=1in, left=1in, right=1in]{geometry}
+
+
+\usepackage{filecontents}
+
+\begin{filecontents}{\jobname.bib}
+\end{filecontents}
+
+
+\title{深度學習應用——作業四報告}
+\author{B03902072 江廷睿}
+\date{}
+
+\usepackage{listings}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\usepackage{graphicx}
+\usepackage[margin=1cm]{caption}
+\usepackage{subcaption}
+\usepackage{float}
+
+\usepackage{mathspec}
+\setmainfont{Noto Serif CJK TC}
+% \setmathsfont(Digits,Latin,Greek)[Numbers={Lining,Proportional}]{DejaVu Math TeX Gyre}
+\newfontfamily\ZhFont{Noto Serif CJK TC}
+\newfontfamily\SmallFont[Scale=0.8]{Droid Sans}
+% \newfontfamily\SmallSmallFont[Scale=0.7]{Noto Serif CJK}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{B03902072\ZhFont{江廷睿}}
+\lhead{深度學習應用——作業四}
+\cfoot{\thepage / \pageref{LastPage}}
+\XeTeXlinebreaklocale "zh"
+
+\renewcommand\tablename{表}
+\renewcommand\figurename{圖}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\section{Model Description}
+
+\subsection{模型架構}
+
+\subsubsection*{圖片標籤的前處理}
+
+圖片部份的前處理有：把原圖縮小到 $64 \times 64$ ，並把 $[0, 255]$ 的顏色線性對應到 $[-1, +1]$。標籤則是只取頭髮顏色與眼睛顏色相關的標籤，並把頭髮髮顏色跟眼睛顏色各自 one-hot encode 後連接起來作為 generator 與 discriminator 的 condition。
+
+\subsubsection*{Generator}
+
+把 condition 的向量跟 100 維從標準常態分佈取樣出來的雜訊相接，通過 filter 個數為 512、256、128、64、3 ，尺寸為 $4 \times 4$ ， stride 為 $2$ 的 deconvolution layer ，除了最後一層以外，每一層都使用 Batch Normalization 與激發函數 RuLU  。最後一層則是使用 $\tanh$ 作為激發函數，產生 $64 \times 64$ ，通道數為 $3$ 的圖像。
+
+\subsubsection*{Discriminator}
+
+把輸入通過 filter 個數分別為 32、64、128、256，尺寸為 $4 \times 4$， stride 為 $2$ ，的 convolution layer ，得到 $4 \times 4$ ，通道數為 $256$ 的張量。接著把 condition 的向量複製 $16$ 份，接到 convolution layer 產生的張量後。接著再把得到的張量通過個數為 128、128 ，尺寸為 $1 \times 1$ 與 $4 \times 4$ 的 convolution layer 。其中除了最後一層以外，在每一層後都使用 Leaky ReLU 作為激發函數。
+
+\subsection{Generator 跟 Discriminator 的目標函數}
+
+令 $x$ 為隨機取樣的真實圖片，$c$ 為那張圖片的 condition ， $c'$ 為隨機取樣的錯誤 condition ，$G$ 為 generator 函數、$D$ 為 discriminator 函數 $\alpha$ 為從 $[0, 1)$ 的均勻分布取樣的隨機數。generator 的目標函數為
+
+\begin{equation*}
+  \max D(G(c), c)
+\end{equation*}
+
+discriminator 的目標函數為
+
+\begin{equation*}
+  \max D(x, c) -\max\{D(G(c), c), D(x, c')\} - \lambda (\lVert \nabla D(\alpha x + (1 - \alpha) G(c)) \rVert_2 - 1)^2
+\end{equation*}
+
+這裡 $\lambda$ 使用 10 。
+
+\subsection{其餘超參數}
+
+\begin{itemize}
+\item Optimizer: RMSprop
+\item Learning Rate: $0.0002$
+\item 此外每更新 5 次 discriminator 才更新一次 generator 。
+\end{itemize}
+
+
+\section{How do you improve your performance}
+
+\subsection{使用 Improved W-GAN}
+
+相較於 W-GAN ， Improved W-GAN 不對 discriminitor 的參數的最 weight-clipping ，而是在產生的圖片與真的圖片之間隨機內插一點，並在目標函數中減少 generator 在該點的梯度的 L2-norm 。
+
+\subsection{Discriminator 的目標函數}
+
+原先使用的損失函數為
+
+\begin{equation*}
+  \max D(x, c) - 0.5 D(G(c), c) - 0.5 D(x, c') - \lambda (\lVert \nabla D(\alpha x + (1 - \alpha) G(c)) \rVert_2 - 1)^2  
+\end{equation*}
+
+但有可能是因為 discriminator 可以把 $D(G(c), c)$ 降得很低，以至於忽略了 $D(G(c), c)$ ，所以產生的圖像不太考慮 condition 。因此若是把目標函數改成
+
+\begin{equation*}
+  \max D(x, c) -\max\{D(G(c), c), D(x, c')\} - \lambda (\lVert \nabla D(\alpha x + (1 - \alpha) G(c)) \rVert_2 - 1)^2
+\end{equation*}
+
+就可以強迫 discriminator 必須要同時能夠分辨出假的圖像還要能分辨出 condition 才能增加整體目標函數的數值。
+
+\section{Experiment settings and observation}
+
+\subsection{使用 Improved W-GAN}
+
+使用 improved W-GAN 相較於一般的 GAN ，可以產生更清晰的圖片。
+
+\subsection{Discriminator 的目標函數}
+
+在使用更改後的目標函數後，產生出來的圖片顯然更與 condition 相關。
+
+\end{document}
