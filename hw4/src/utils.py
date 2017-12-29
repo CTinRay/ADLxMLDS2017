@@ -67,8 +67,10 @@ class DataProcessor:
              'pink eyes': 3, 'yellow eyes': 4, 'aqua eyes': 5,
              'purple eyes': 6, 'green eyes': 7, 'brown eyes': 8,
              'red eyes': 9, 'blue eyes': 10}
-        img_tags = self._read_tags(tag_file)
-        self._img_labels = self._encode_tags(img_tags)
+
+        if img_dir is not None and tag_file is not None:
+            img_tags = self._read_tags(tag_file)
+            self._img_labels = self._encode_tags(img_tags)
 
     def _read_tags(self, tag_file):
         img_tags = []
@@ -135,3 +137,28 @@ class DataProcessor:
 
     def get_dim_condition(self):
         return len(self._eye_tag_dict) + len(self._hair_tag_dict)
+
+    def get_test_condition(self, filename, n_imgs_per_cond=5):
+        ids = []
+        tags = []
+        with open(filename) as f:
+            for l in f:
+                cols = l.strip().split(',')
+                ids.append(int(cols[0]))
+                tags.append(cols[1])
+
+        condition = np.zeros(
+            [len(tags) * n_imgs_per_cond,
+             len(self._hair_tag_dict) + len(self._eye_tag_dict)])
+        for t, tag in enumerate(tags):
+            for hair, h in self._hair_tag_dict.items():
+                for eye, e in self._eye_tag_dict.items():
+                    for i in range(n_imgs_per_cond):
+                        if hair in tag:
+                            condition[t * n_imgs_per_cond + i,
+                                      h] = 1
+                        if eye in tag:
+                            condition[t * n_imgs_per_cond + i,
+                                      len(self._hair_tag_dict) + e] = 1
+
+        return ids, condition
