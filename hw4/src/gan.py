@@ -16,7 +16,7 @@ class GAN:
                  batch_size=64,
                  max_epochs=300,
                  g_update_interval=5,
-                 lambda_grad=15,
+                 lambda_grad=10,
                  save_interval=5,
                  save_dir='./',
                  use_cuda=None):
@@ -94,7 +94,7 @@ class GAN:
                                                 interpolates,
                                                 grad_outputs=ones,
                                                 create_graph=True)[0]
-                grad_penalty = torch.mean((gradients - 1) ** 2)
+                grad_penalty = torch.mean((gradients.norm(2, dim=1) - 1) ** 2)
 
                 d_false = torch.max(torch.cat([d_fake, d_gen], dim=1),
                                     dim=1)[0]
