@@ -115,6 +115,27 @@ discriminator 的目標函數為
 
 \subsection{Discriminator 的目標函數}
 
-在使用更改後的目標函數後，產生出來的圖片顯然更與 condition 相關。
+參考圖 \ref{fig:compare-obj} 為隨機取樣出的 4 個 condition 。在使用更改後的目標函數後，可以看到在髮色部份，使用更改過後的目標函數產生出來的圖片除了第三張以外都算是有對應到 condition ，且眼睛顏色第三張圖片也顯然有對應到。相較於使用原先的目標函數產生的圖片只有第三張的髮色與眼睛顏色有對應到以外，有顯著的提昇。此外，圖像的品質看起來也比較好了。
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.45\textwidth}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/0-4-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/10-0-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/4-5-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/5-3-0.jpg}
+  \caption{使用原來的目標函數}
+\end{subfigure}
+\begin{subfigure}{0.45\textwidth}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-max-loss/0-4-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-max-loss/10-0-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-max-loss/4-5-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-max-loss/5-3-0.jpg}
+  \caption{使用更改後的目標函數}
+\end{subfigure}
+\caption{比較使用不同目標函數的效果。condition 分別為：橘髮黃眼、棕髮灰眼、綠髮水色眼、紅髮粉紅眼。}
+\label{fig:compare-obj}
+\end{figure}
+
 
 \end{document}
