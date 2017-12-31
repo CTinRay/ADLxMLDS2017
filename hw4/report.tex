@@ -89,17 +89,17 @@ discriminator 的目標函數為
 
 \subsection{使用 Improved W-GAN}
 
-相較於 W-GAN ， Improved W-GAN 不對 discriminitor 的參數的最 weight-clipping ，而是在產生的圖片與真的圖片之間隨機內插一點，並在目標函數中減少 generator 在該點的梯度的 L2-norm 。
+相較於 W-GAN ， Improved W-GAN 不對 discriminitor 的參數的作 weight-clipping ，而是在產生的圖片與真的圖片之間隨機內插一點，並在目標函數中減少 generator 在該點的梯度的 L2-norm 。
 
 \subsection{Discriminator 的目標函數}
 
-原先使用的損失函數為
+原先使用的目標函數為
 
 \begin{equation*}
   \max D(x, c) - 0.5 D(G(c), c) - 0.5 D(x, c') - \lambda (\lVert \nabla D(\alpha x + (1 - \alpha) G(c)) \rVert_2 - 1)^2  
 \end{equation*}
 
-但有可能是因為 discriminator 可以把 $D(G(c), c)$ 降得很低，以至於忽略了 $D(G(c), c)$ ，所以產生的圖像不太考慮 condition 。因此若是把目標函數改成
+但有可能是因為 discriminator 可以把 $D(G(c), c)$ 降得很低，以至於忽略了要降低 $D(x, c')$ ，所以產生的圖像不太考慮 condition 。因此若是把目標函數改成
 
 \begin{equation*}
   \max D(x, c) -\max\{D(G(c), c), D(x, c')\} - \lambda (\lVert \nabla D(\alpha x + (1 - \alpha) G(c)) \rVert_2 - 1)^2
@@ -111,11 +111,33 @@ discriminator 的目標函數為
 
 \subsection{使用 Improved W-GAN}
 
-使用 improved W-GAN 相較於一般的 GAN ，可以產生更清晰的圖片。
+參考圖 \ref{fig:compare-wgan-iwgan} 為同樣訓練了 230 個 epochs 的結果。從圖中可以看到使用 improved W-GAN 產生的圖片顯然比 W-GAN 產生的還更清晰。
+
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.45\textwidth}
+  \includegraphics[width=0.2\linewidth]{imgs/wgan/0-4-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/wgan/10-0-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/wgan/4-5-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/wgan/5-3-0.jpg}
+  \caption{使用 W-GAN}
+\end{subfigure}
+\begin{subfigure}{0.45\textwidth}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/0-4-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/10-0-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/4-5-0.jpg}
+  \includegraphics[width=0.2\linewidth]{imgs/iwgan-230-original-loss/5-3-0.jpg}
+  \caption{使用 Improved W-GAN}
+\end{subfigure}
+\caption{比較 W-GAN 與 Improved W-GAN 的差別。condition 分別為：橘髮黃眼、棕髮灰眼、綠髮水色眼、紅髮粉紅眼。}
+\label{fig:compare-wgan-iwgan}
+\end{figure}
+
 
 \subsection{Discriminator 的目標函數}
 
-參考圖 \ref{fig:compare-obj} 為隨機取樣出的 4 個 condition 。在使用更改後的目標函數後，可以看到在髮色部份，使用更改過後的目標函數產生出來的圖片除了第三張以外都算是有對應到 condition ，且眼睛顏色第三張圖片也顯然有對應到。相較於使用原先的目標函數產生的圖片只有第三張的髮色與眼睛顏色有對應到以外，有顯著的提昇。此外，圖像的品質看起來也比較好了。
+參考圖 \ref{fig:compare-obj} 為第 230 個 epoch 隨機取樣出的 4 個 condition 。在使用更改後的目標函數後，可以看到在髮色部份，使用更改過後的目標函數產生出來的圖片除了第三張以外都算是有對應到 condition ，且眼睛顏色第三張圖片也顯然有對應到。相較於使用原先的目標函數產生的圖片只有第三張的髮色與眼睛顏色有對應到以外，有顯著的提昇。此外，圖像的品質看起來也比較好了。
 
 \begin{figure}[H]
 \centering
