@@ -25,7 +25,7 @@ def main(args):
     for t, tid in enumerate(tids):
         for i in range(args.n_imgs_per_cond):
             filename = os.path.join(args.out_dir,
-                                    'sample-{}-{}.jpg'.format(tid, i + 1))
+                                    'sample_{}_{}.jpg'.format(tid, i + 1))
             skimage.io.imsave(filename, imgs[t * args.n_imgs_per_cond + i])
 
 
