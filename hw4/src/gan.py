@@ -19,6 +19,7 @@ class GAN:
                  lambda_grad=10,
                  save_interval=5,
                  save_dir='./',
+                 cuda_rand_seed=None,
                  use_cuda=None):
         self._batch_size = batch_size
         self._max_epochs = max_epochs
@@ -34,6 +35,8 @@ class GAN:
         if self._use_cuda:
             self._generator = self._generator.cuda()
             self._discriminator = self._discriminator.cuda()
+            if cuda_rand_seed is not None:
+                torch.cuda.manual_seed_all(cuda_rand_seed)
 
         self._optimizer_g = torch.optim.RMSprop(
             self._generator.parameters(),
@@ -87,20 +90,23 @@ class GAN:
                 d_gen = self._discriminator(img_gen, condition_real)
                 d_fake = self._discriminator(img_fake, condition_fake)
 
-                interpolates = img_real * alphas + img_gen * (1 - alphas)
-                d_interpolates = self._discriminator(interpolates,
-                                                     condition_real)
-                gradients = torch.autograd.grad(d_interpolates,
-                                                interpolates,
-                                                grad_outputs=ones,
-                                                create_graph=True)[0]
-                grad_penalty = torch.mean((gradients.norm(2, dim=1) - 1) ** 2)
+                # interpolates = img_real * alphas + img_gen * (1 - alphas)
+                # d_interpolates = self._discriminator(interpolates,
+                #                                      condition_real)
+                # gradients = torch.autograd.grad(d_interpolates,
+                #                                 interpolates,
+                #                                 grad_outputs=ones,
+                #                                 create_graph=True)[0]
+                # grad_penalty = torch.mean((gradients.norm(2, dim=1) - 1) ** 2)
 
-                d_false = torch.max(torch.cat([d_fake, d_gen], dim=1),
-                                    dim=1)[0]
+                d_false = torch.mean(torch.cat([d_fake, d_gen], dim=1),
+                                     dim=1)
                 loss_d = torch.mean(d_false) \
                     - torch.mean(d_real) \
-                    + self._lambda_grad * grad_penalty
+                    # + self._lambda_grad * grad_penalty
+
+                for p in self._discriminator.parameters():
+                    p.data.clamp_(-0.01, 0.01)
 
                 self._optimizer_d.zero_grad()
                 loss_d.backward()

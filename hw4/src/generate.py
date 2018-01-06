@@ -11,7 +11,8 @@ from utils import DataProcessor
 
 def main(args):
     dim_condition = 23
-    gan = GAN(dim_condition)
+    gan = GAN(dim_condition,
+              cuda_rand_seed=args.rand_seed)
     gan.load(args.model)
 
     data_processor = DataProcessor(None, None)
@@ -34,6 +35,7 @@ def _parse_args():
     parser.add_argument('test_file', type=str)
     parser.add_argument('out_dir', type=str)
     parser.add_argument('--n_imgs_per_cond', type=int, default=5)
+    parser.add_argument('--rand_seed', type=int, default=0)
     args = parser.parse_args()
     return args
 
